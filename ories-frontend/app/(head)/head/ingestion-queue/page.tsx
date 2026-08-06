@@ -98,7 +98,7 @@ export default function IngestionQueue() {
                                 View File
                             </a>
                             <Link 
-                                href={`/head/encode?title=${encodeURIComponent(file.name)}`}
+                                href={`/head/encode?title=${encodeURIComponent(file.name)}&link=${encodeURIComponent(file.url)}`}
                                 className="rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
                             >
                                 Encode

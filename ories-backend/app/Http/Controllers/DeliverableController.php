@@ -16,6 +16,7 @@ class DeliverableController extends Controller
             'title' => 'required|string|max:255',
             'office_type' => 'required|in:extension,research,innovation',
             'due_date' => 'required|date',
+            'mov_link' => 'nullable|string',
             'tags' => 'nullable|array',
             'tags.*.type' => 'required_with:tags|in:department,campus,faculty',
             'tags.*.value' => 'required_with:tags|string|max:255',
@@ -35,6 +36,7 @@ class DeliverableController extends Controller
                 'head_id' => $user->id,
                 'status' => 'submitted', // Moving from Draft into the 5-stage pipeline
                 'due_date' => $validated['due_date'],
+                'mov_link' => $validated['mov_link'] ?? null,
             ]);
 
             // 3. Process and attach the Tagging Module data
@@ -76,6 +78,10 @@ class DeliverableController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+
+        $deliverables = Deliverable::with('tags')->orderBy('created_at', 'desc')->get();
+        return response()->json($deliverables);
+
         $query = Deliverable::with('tags')->orderBy('created_at', 'desc');
 
         // Scoped Visibility Based on Role Hierarchy

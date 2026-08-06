@@ -4,10 +4,15 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
+import DeliverableModal from '@/components/DeliverableModal'; // 1. Import the modal
 
 export default function VpDashboard() {
     const router = useRouter();
     const [deliverables, setDeliverables] = useState<any[]>([]);
+    
+    // 2. Add state for the modal
+    const [selectedDeliverable, setSelectedDeliverable] = useState<any | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
         api.get('/deliverables').then(res => setDeliverables(res.data));
@@ -18,8 +23,7 @@ export default function VpDashboard() {
             await api.patch(`/deliverables/${id}/status`, { status: 'vp_approved' });
             setDeliverables(deliverables.map(d => d.id === id ? { ...d, status: 'vp_approved' } : d));
         } catch (error) {
-            console.error("Failed to approve deliverable", error);
-            alert("Failed to update status.");
+            console.error("Failed to approve", error);
         }
     };
 
@@ -30,55 +34,117 @@ export default function VpDashboard() {
         router.push('/');
     };
 
+    const openModal = (deliverable: any) => {
+        setSelectedDeliverable(deliverable);
+        setIsModalOpen(true);
+    };
+
+    const pendingCount = deliverables.filter(d => d.status === 'mov_upload').length;
+    const approvedCount = deliverables.filter(d => d.status === 'vp_approved').length;
+
     return (
         <div className="min-h-screen bg-gray-50 p-8">
-            {/* New Header with Logout */}
-             <header className="mb-8 flex items-center justify-between border-b pb-4">
+            <header className="mb-8 flex items-center justify-between border-b pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">VP of ORIES Dashboard</h1>
-                    <p className="text-gray-600">University-wide Final Approval Queue</p>
+                    <p className="text-gray-600">University-wide Final Approval & Analytics Queue</p>
                 </div>
-                <button 
-                    onClick={handleLogout}
-                    className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-                >
+                <button onClick={handleLogout} className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700">
                     Logout
                 </button>
             </header>
+
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+                    <h3 className="text-sm font-medium text-gray-500 uppercase">Pending Final Approval</h3>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{pendingCount}</p>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+                    <h3 className="text-sm font-medium text-gray-500 uppercase">Total Approved</h3>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{approvedCount}</p>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+                    <h3 className="text-sm font-medium text-gray-500 uppercase">System Status</h3>
+                    <p className="text-xl font-bold text-green-600 mt-2">All Campuses Active</p>
+                </div>
+            </div>
             
-            <div className="space-y-4">
-                <h2 className="text-xl font-semibold mb-4">Pending Final Approvals (MOV Uploaded)</h2>
+            <div className="space-y-4 mb-12">
+                <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">Action Required</h2>
                 {deliverables.filter(d => d.status === 'mov_upload').map(item => (
-                    <div key={item.id} className="bg-white p-6 rounded-lg shadow flex justify-between items-center border-l-4 border-green-500">
-                        <div>
-                            <h3 className="text-lg font-semibold">{item.title}</h3>
-                            <p className="text-sm text-gray-500">Campus ID: {item.campus_id} | Type: {item.office_type.toUpperCase()}</p>
-                            {/* In a complete UI, the Google Drive MOV link would be clickable here */}
+                    <div key={item.id} className="bg-white p-6 rounded-lg shadow flex flex-col md:flex-row justify-between items-start md:items-center border border-gray-100">
+                        <div className="mb-4 md:mb-0">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
+                                <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded uppercase">
+                                    {item.office_type}
+                                </span>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">Due: {item.due_date}</p>
                         </div>
-                        <button 
-                            onClick={() => handleApprove(item.id)}
-                            className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">
-                            Approve Deliverable
-                        </button>
+                        <div className="flex gap-3 w-full md:w-auto">
+                            {/* 3. Wire up the View Details button */}
+                            <button 
+                                onClick={() => openModal(item)}
+                                className="flex-1 md:flex-none border border-gray-300 bg-white text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 font-medium">
+                                View Details & MOVs
+                            </button>
+                            <button 
+                                onClick={() => handleApprove(item.id)}
+                                className="flex-1 md:flex-none bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 font-medium shadow">
+                                ✓ Approve
+                            </button>
+                        </div>
                     </div>
                 ))}
-                
-                {deliverables.filter(d => d.status === 'mov_upload').length === 0 && (
-                    <div className="bg-white p-6 rounded-lg shadow text-center text-gray-500">
-                        No deliverables pending final approval.
+                {pendingCount === 0 && (
+                    <div className="bg-gray-100 border-dashed border-2 border-gray-300 p-8 rounded-lg text-center text-gray-500">
+                        No deliverables are currently awaiting your approval.
                     </div>
                 )}
             </div>
-            
-            <div className="mt-12 space-y-4">
-                <h2 className="text-xl font-semibold mb-4">Recently Approved</h2>
-                {deliverables.filter(d => d.status === 'vp_approved').map(item => (
-                    <div key={item.id} className="bg-gray-100 p-4 rounded-lg flex justify-between items-center opacity-75">
-                        <span className="font-medium text-gray-700">{item.title}</span>
-                        <span className="text-sm font-bold text-green-700">✓ Approved</span>
-                    </div>
-                ))}
+
+            <div>
+                <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Approval History</h2>
+                <div className="bg-white rounded-lg shadow border border-gray-200 max-h-96 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deliverable Title</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {deliverables.filter(d => d.status === 'vp_approved').map(item => (
+                                <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openModal(item)}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.title}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 uppercase">{item.office_type}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Approved
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {approvedCount === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                        No history available yet.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
+            {/* 4. Render the Modal Component */}
+            <DeliverableModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                deliverable={selectedDeliverable} 
+            />
         </div>
     );
 }

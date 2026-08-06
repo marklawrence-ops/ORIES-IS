@@ -16,8 +16,9 @@ class Deliverable extends Model
         'office_type',
         'campus_id',
         'head_id',
-        'status', // draft, submitted, director_endorsed, mov_upload, vp_approved
+        'status',
         'due_date',
+        'mov_link'
     ];
 
     public function campus(): BelongsTo

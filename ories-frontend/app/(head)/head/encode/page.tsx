@@ -1,10 +1,16 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
 
+
 export default function EncodeDeliverable() {
+
+    const searchParams = useSearchParams();
+    const initialTitle = searchParams.get('title') || '';
+    const initialLink = searchParams.get('link') || ''; // Catch the Google Drive URL
+
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
@@ -38,6 +44,7 @@ export default function EncodeDeliverable() {
                     title,
                     office_type: officeType,
                     due_date: dueDate,
+                    mov_link: initialLink,
                     tags
                 };
                 

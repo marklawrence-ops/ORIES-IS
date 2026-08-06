@@ -17,6 +17,7 @@ class DeliverableController extends Controller
             'office_type' => 'required|in:extension,research,innovation',
             'due_date' => 'required|date',
             'mov_link' => 'nullable|string',
+            'status' => 'required|string|in:draft,submitted',
             'tags' => 'nullable|array',
             'tags.*.type' => 'required_with:tags|in:department,campus,faculty',
             'tags.*.value' => 'required_with:tags|string|max:255',
@@ -36,6 +37,7 @@ class DeliverableController extends Controller
                 'head_id' => $user->id,
                 'status' => 'submitted', // Moving from Draft into the 5-stage pipeline
                 'due_date' => $validated['due_date'],
+                'status' => $validated['status'],
                 'mov_link' => $validated['mov_link'] ?? null,
             ]);
 
@@ -103,10 +105,19 @@ class DeliverableController extends Controller
     {
         $user = $request->user();
         $validated = $request->validate([
-            'status' => 'required|in:director_endorsed,mov_upload,vp_approved,returned'
+            'status' => 'required|string|in:director_endorsed,mov_upload,vp_approved',
         ]);
 
         $deliverable = Deliverable::findOrFail($id);
+
+        $deliverable->status = $request->status;
+        
+        // If an updated/additional link is passed, save it
+        if ($request->has('mov_link')) {
+            $deliverable->mov_link = $request->mov_link;
+        }
+
+        $deliverable->save();
 
         // State Machine Authorization
         if ($user->role === 'director' && $validated['status'] === 'director_endorsed') {
@@ -123,5 +134,53 @@ class DeliverableController extends Controller
             'message' => 'Deliverable status updated successfully.',
             'deliverable' => $deliverable
         ], 200);
+    }
+
+    public function show($id)
+    {
+        $deliverable = Deliverable::with('tags')->findOrFail($id);
+        return response()->json($deliverable);
+    }
+
+    // Replace your current update method with this complete version
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'due_date' => 'required|date',
+            'office_type' => 'required|string',
+            'status' => 'required|string',
+        ]);
+
+        $deliverable = Deliverable::findOrFail($id);
+        
+        $deliverable->update([
+            'title' => $request->title,
+            'due_date' => $request->due_date,
+            'office_type' => $request->office_type,
+            'status' => $request->status,
+        ]);
+
+        // Fixes the 500 error: Safely delete old tags and recreate them
+        if ($request->has('tags')) {
+            $deliverable->tags()->delete(); // Wipe old tags
+            
+            foreach ($request->tags as $tag) {
+                $tagData = ['deliverable_id' => $deliverable->id];
+                
+                // Map the frontend types to your exact database columns
+                if ($tag['type'] === 'campus') {
+                    $tagData['tagged_campus_id'] = (int) filter_var($tag['value'], FILTER_SANITIZE_NUMBER_INT) ?: null;
+                } elseif ($tag['type'] === 'department') {
+                    $tagData['tagged_department'] = $tag['value'];
+                } elseif ($tag['type'] === 'faculty') {
+                    $tagData['collaborator_name'] = $tag['value'];
+                }
+
+                \App\Models\DeliverableTag::create($tagData);
+            }
+        }
+
+        return response()->json($deliverable);
     }
 }

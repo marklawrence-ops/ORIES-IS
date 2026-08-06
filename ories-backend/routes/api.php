@@ -16,6 +16,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/deliverables', [DeliverableController::class, 'index']);
     Route::patch('/deliverables/{id}/status', [DeliverableController::class, 'updateStatus']);
     Route::get('/ingestion/sync', [IngestionController::class, 'fetchDriveFiles']);
+    Route::get('/deliverables/{id}', [DeliverableController::class, 'show']);
+    Route::put('/deliverables/{id}', [DeliverableController::class, 'update']);
     
     Route::get('/user', function (Request $request) {
         return $request->user()->load('campus'); 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
 
@@ -35,7 +35,7 @@ export default function EncodeDeliverable() {
         setTags(tags.filter((_, index) => index !== indexToRemove));
     };
 
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: MouseEvent<HTMLButtonElement>, statusType: string) => {
             e.preventDefault();
             setLoading(true);
             
@@ -45,6 +45,7 @@ export default function EncodeDeliverable() {
                     office_type: officeType,
                     due_date: dueDate,
                     mov_link: initialLink,
+                    status: statusType,
                     tags
                 };
                 
@@ -66,7 +67,7 @@ export default function EncodeDeliverable() {
                 <p className="text-gray-600">Finalize details and tag collaborators for the ingested file[cite: 8, 9].</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
+            <form className="space-y-8 max-w-3xl">
                 {/* 1. Core Deliverable Metadata */}
                 <div className="rounded-lg bg-white p-6 shadow space-y-4 border-t-4 border-blue-600">
                     <h2 className="text-xl font-semibold text-gray-800 border-b pb-2">1. General Information</h2>
@@ -174,11 +175,18 @@ export default function EncodeDeliverable() {
                     >
                         Cancel
                     </button>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    <button 
+                        type="button" 
+                        onClick={(e) => handleSubmit(e, 'draft')}
+                        className="bg-gray-200 text-gray-800 px-6 py-2 rounded hover:bg-gray-300 font-medium transition-colors"
                     >
+                        Save as Draft
+                    </button>
+                    <button
+                        type="button" 
+                        onClick={(e) => handleSubmit(e, 'submitted')}
+                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-medium shadow transition-colors"
+                        >
                         {loading ? 'Encoding...' : 'Save & Submit to Director'}
                     </button>
                 </div>

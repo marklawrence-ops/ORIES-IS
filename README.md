@@ -1,10 +1,3 @@
-Here is a complete, ready-to-use `README.md` tailored specifically for your project's architecture. It includes all the critical steps for the Next.js frontend, the Laravel backend, the PostgreSQL database, and the specific Google Drive API credentials we just set up.
-
-You can copy and paste this directly into a `README.md` file in the root of your repository so Aldrin, Axyll, and Christian can get their local environments running smoothly for the defense.
-
----
-
-```markdown
 # ORIES-IS Development Setup Guide
 
 Welcome to the repository for the ORIES Information System. This guide provides the step-by-step process to get the local development environment running on your machine.

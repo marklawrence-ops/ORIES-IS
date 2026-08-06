@@ -17,6 +17,14 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+
+            // 3-Tier Hierarchy Roles
+            $table->enum('role', ['vp_ories', 'director', 'head'])->default('head');
+            
+            // Relationships
+            $table->foreignId('campus_id')->nullable()->constrained('campuses')->nullOnDelete();
+            $table->string('department_name')->nullable(); // e.g., 'College of Engineering'
+            
             $table->rememberToken();
             $table->timestamps();
         });

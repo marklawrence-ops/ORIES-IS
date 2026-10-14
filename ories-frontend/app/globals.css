@@ -1,1 +1,42 @@
 @import "tailwindcss";
+
+/* EVSU maroon and gold */
+@theme {
+  --color-brand-50: #fbf3f3;
+  --color-brand-100: #f5e1e1;
+  --color-brand-200: #e9bdbd;
+  --color-brand-500: #a33a3a;
+  --color-brand-600: #8b2727;
+  --color-brand-700: #741d1d;
+  --color-brand-800: #5c1717;
+  --color-brand-900: #3f1010;
+  --color-gold-400: #e3b23c;
+  --color-gold-500: #c9971d;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: #f6f6f7;
+  color: #1f2328;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .print-area {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

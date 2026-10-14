@@ -28,6 +28,8 @@
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="GOOGLE_DRIVE_BACKUP_ENABLED" value="false"/>
+        <env name="ORIES_MAIL_NOTIFICATIONS" value="false"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

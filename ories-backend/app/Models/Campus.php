@@ -10,15 +10,20 @@ class Campus extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'code'];
+
+    public function units(): HasMany
+    {
+        return $this->hasMany(Unit::class);
+    }
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }
 
-    public function deliverables(): HasMany
+    public function projects(): HasMany
     {
-        return $this->hasMany(Deliverable::class);
+        return $this->hasMany(Project::class);
     }
 }

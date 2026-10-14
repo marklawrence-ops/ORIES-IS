@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
-import { isAxiosError } from 'axios';
-import api from '@/lib/axios';
+import { useState, type FormEvent } from 'react';
+import api, { errorMessage, saveSession } from '@/lib/api';
+import { Alert, Button, Field, Input } from '@/components/ui';
 
 export default function LoginPage() {
     const router = useRouter();
@@ -13,85 +13,56 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
             const response = await api.post('/login', { email, password });
-            
-            const { access_token, user } = response.data;
-
-            // Store the token and role securely in cookies for Middleware access
-            Cookies.set('ories_token', access_token, { expires: 1 }); // Expires in 1 day
-            Cookies.set('ories_role', user.role, { expires: 1 });
-
-            // Route based on the exact ENUM role from the database
-            if (user.role === 'vp_ories') {
-                router.push('/vp/dashboard');
-            } else if (user.role === 'director') {
-                router.push('/director/dashboard');
-            } else if (user.role === 'head') {
-                router.push('/head/dashboard');
-            }
-
+            saveSession(response.data.access_token, response.data.user.role);
+            router.push('/dashboard');
         } catch (err) {
-            setError((isAxiosError(err) && err.response?.data?.message) || 'Authentication failed. Please check your credentials.');
-        } finally {
+            setError(errorMessage(err, 'Authentication failed. Please check your credentials.'));
             setLoading(false);
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-            <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-10 shadow-md">
-                <div className="text-center">
-                    <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-                        ORIES-IS
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Sign in to your administrative dashboard
+        <div className="flex min-h-screen flex-col lg:flex-row">
+            <div className="flex flex-col justify-between bg-brand-700 px-8 py-10 text-white lg:w-1/2 lg:px-16">
+                <div>
+                    <p className="text-sm font-semibold uppercase tracking-widest text-gold-400">Eastern Visayas State University</p>
+                    <h1 className="mt-4 text-3xl font-bold leading-tight lg:text-4xl">Office of Research, Innovation, and Extension Services Information System</h1>
+                    <p className="mt-4 max-w-md text-brand-100">
+                        Submit, track, and verify research, innovation, and extension records from proposal to publication,
+                        commercialization, policy, and technology transfer — in one place for all EVSU campuses.
                     </p>
                 </div>
-                
-                <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-                    <div className="-space-y-px rounded-md shadow-sm">
-                        <div>
-                            <input
-                                type="email"
-                                required
-                                className="relative block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <input
-                                type="password"
-                                required
-                                className="relative block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
+                <p className="mt-10 text-xs text-brand-200">ORIES-IS · Tacloban · Burauen · Carigara · Dulag · Ormoc · Tanauan</p>
+            </div>
+
+            <div className="flex flex-1 items-center justify-center p-6">
+                <form onSubmit={handleLogin} className="w-full max-w-sm space-y-5">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900">Sign in</h2>
+                        <p className="text-sm text-gray-600">Use your EVSU account.</p>
                     </div>
-
-                    {error && (
-                        <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                            {error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
-                    >
-                        {loading ? 'Authenticating...' : 'Sign In'}
-                    </button>
+                    {error && <Alert>{error}</Alert>}
+                    <Field label="Email address">
+                        <Input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@evsu.edu.ph" />
+                    </Field>
+                    <Field label="Password">
+                        <Input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                    </Field>
+                    <Button type="submit" disabled={loading} className="w-full">{loading ? 'Signing in…' : 'Sign in'}</Button>
+                    <p className="text-center text-sm text-gray-600">
+                        Faculty or non-teaching personnel without an account?{' '}
+                        <Link href="/register" className="font-medium text-brand-700 hover:underline">Register</Link>
+                    </p>
+                    <p className="text-center text-xs text-gray-500">
+                        <Link href="/verify" className="hover:underline">Verify an ORIES certificate</Link>
+                    </p>
                 </form>
             </div>
         </div>

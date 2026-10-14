@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ORIES-IS | Dashboard",
-  description: "Manage and Monitor ORIEs Deliverables",
+  title: "ORIES-IS",
+  description: "Research, Innovation, and Extension Information System of Eastern Visayas State University",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

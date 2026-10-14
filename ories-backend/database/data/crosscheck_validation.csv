@@ -1,0 +1,50 @@
+category,label,title_a,title_b
+exact,duplicate,Smart Water Quality Monitoring System for Aquaculture Ponds,Smart Water Quality Monitoring System for Aquaculture Ponds
+exact,duplicate,Financial Literacy Program for Market Vendors in Tacloban City,Financial Literacy Program for Market Vendors in Tacloban City
+exact,duplicate,Inventory of Endemic Medicinal Plants in Leyte Highlands,Inventory of Endemic Medicinal Plants in Leyte Highlands
+exact,duplicate,Solar-Powered Cold Storage Unit for Small-Scale Fishers,Solar-Powered Cold Storage Unit for Small-Scale Fishers
+exact,duplicate,Basic Computer Literacy Training for Senior Citizens,Basic Computer Literacy Training for Senior Citizens
+case,duplicate,Flood Early Warning Mobile Application for Barangays,FLOOD EARLY WARNING MOBILE APPLICATION FOR BARANGAYS
+case,duplicate,Community-Based Mangrove Rehabilitation and Livelihood Program,community-based mangrove rehabilitation and livelihood program
+case,duplicate,Automated Hydroponics Controller Using Microcontrollers,Automated hydroponics controller using microcontrollers
+case,duplicate,Teaching Strategies for Mother Tongue-Based Multilingual Education,Teaching strategies for mother tongue-based multilingual education.
+case,duplicate,Food Safety and Sanitation Training for Food Vendors,"Food Safety and Sanitation Training for Food Vendors!"
+case,duplicate,Assessment of Microplastic Contamination in Cancabato Bay,Assessment of Microplastic Contamination in Cancabato Bay (Leyte)
+typo,duplicate,Development of a Low-Cost Seismic Retrofitting Technique for School Buildings,Developement of a Low Cost Seismic Retroffiting Technique for School Buildings
+typo,duplicate,Thermal Performance of Coconut Coir Composite Panels,Thermal Perfomance of Coconut Coir Composit Panels
+typo,duplicate,Calamansi-Based Functional Juice Beverage with Extended Shelf Life,Calamansi Based Functional Juice Beverge with Extended Shelf-Life
+typo,duplicate,Ethnobotanical Survey of Medicinal Plants in Eastern Visayas,Ethnobotanical Survey of Medicinal Plant in Eastern Visaya
+typo,duplicate,Design of a Bamboo-Reinforced Pedestrian Footbridge,Design of a Bambo Reinforced Pedestrian Foot Bridge
+typo,duplicate,Livelihood Training on Abaca Handicraft Production,Livelihood Trainings on Abaca Handicrafts Production
+wording,duplicate,Flood Early Warning Mobile Application for Barangays Along the Binahaan River,Flood Early Warning Mobile Application for Barangays Along Binahaan River
+wording,duplicate,Financial Literacy Program for Market Vendors in Tacloban City,A Financial Literacy Program for Market Vendors in Tacloban City
+wording,duplicate,Solar-Powered Cold Storage Unit for Small-Scale Fishers,Solar-Powered Cold Storage Units for Small-Scale Fishers in Leyte
+wording,duplicate,Assessment of Microplastic Contamination in Cancabato Bay,An Assessment of the Microplastic Contamination in Cancabato Bay
+wording,duplicate,Community-Based Mangrove Rehabilitation and Livelihood Program,Community-Based Mangrove Rehabilitation and Livelihood Project
+wording,duplicate,Development of a Rice Straw Biochar Production Kiln,Development of Rice Straw Biochar Production Kiln for Farmers
+reordered,duplicate,Machine Learning Model for Predicting Student Attrition in State Universities,Predictive Model for Student Attrition in State Universities Using Machine Learning
+reordered,duplicate,Mangrove Rehabilitation and Livelihood Program for Coastal Communities,Livelihood and Mangrove Rehabilitation Program for Coastal Communities
+reordered,duplicate,Water Quality Monitoring of Aquaculture Ponds Using IoT Sensors,IoT Sensors for Water Quality Monitoring of Aquaculture Ponds
+reordered,duplicate,Senior Citizens Computer Literacy Training in Carigara,Computer Literacy Training for Senior Citizens in Carigara
+reordered,duplicate,Abaca Handicraft Livelihood Training for Burauen Women,Livelihood Training on Abaca Handicraft for Burauen Women
+reordered,duplicate,Student Attrition in State Universities: A Machine Learning Prediction Model,Machine Learning Model for Predicting Student Attrition in State Universities
+distinct,distinct,Smart Water Quality Monitoring System for Aquaculture Ponds,Financial Literacy Program for Market Vendors in Tacloban City
+distinct,distinct,Inventory of Endemic Medicinal Plants in Leyte Highlands,Solar-Powered Cold Storage Unit for Small-Scale Fishers
+distinct,distinct,Flood Early Warning Mobile Application for Barangays,Thermal Performance of Coconut Coir Composite Panels
+distinct,distinct,Teaching Strategies for Mother Tongue-Based Multilingual Education,Automated Hydroponics Controller Using Microcontrollers
+distinct,distinct,Assessment of Microplastic Contamination in Cancabato Bay,Food Safety and Sanitation Training for Food Vendors
+distinct,distinct,Development of a Rice Straw Biochar Production Kiln,Basic Computer Literacy Training for Senior Citizens
+distinct,distinct,Design of a Bamboo-Reinforced Pedestrian Footbridge,Calamansi-Based Functional Juice Beverage with Extended Shelf Life
+distinct,distinct,Livelihood Training on Abaca Handicraft Production,Ethnobotanical Survey of Medicinal Plants in Eastern Visayas
+same_domain,distinct,Water Quality Monitoring of Aquaculture Ponds in Dulag,Disease Management of Tilapia in Aquaculture Ponds
+same_domain,distinct,Financial Literacy Program for Market Vendors,Digital Marketing Training for Market Vendors
+same_domain,distinct,Computer Literacy Training for Senior Citizens,Health and Wellness Seminar for Senior Citizens
+same_domain,distinct,Seismic Retrofitting of Public School Buildings,Energy Audit of Public School Buildings
+same_domain,distinct,Mangrove Rehabilitation in San Jose Tacloban,Coral Reef Assessment in San Pedro Bay
+same_domain,distinct,Solar-Powered Cold Storage for Fishers,Solar-Powered Irrigation Pump for Rice Farmers
+shared_prefix,distinct,A Study on the Academic Performance of Engineering Students,A Study on the Waste Segregation Practices of Barangay Residents
+shared_prefix,distinct,Development of a Mobile Application for Flood Early Warning,Development of a Mobile Application for Library Book Reservation
+shared_prefix,distinct,Assessment of Microplastic Contamination in Cancabato Bay,Assessment of Teacher Readiness for Blended Learning
+shared_prefix,distinct,Machine Learning Model for Predicting Student Attrition in State Universities,Machine Learning Model for Predicting Crop Yield in Leyte
+shared_prefix,distinct,Impact of Social Media Use on Academic Performance,Impact of Typhoon Haiyan on Coastal Livelihoods
+shared_prefix,distinct,Design and Development of an Inventory System for EVSU Supply Office,Design and Development of an Enrollment System for EVSU Registrar

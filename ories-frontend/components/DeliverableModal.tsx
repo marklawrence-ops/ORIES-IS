@@ -1,28 +1,7 @@
 'use client';
 
 import React from 'react';
-
-interface Tag {
-    id: number;
-    tagged_campus_id?: number | null;
-    tagged_department?: string | null;
-    collaborator_name?: string | null;
-    type?: string;
-    tag_type?: string;
-    name?: string;
-    tag_name?: string;
-    entity_name?: string;
-}
-
-interface Deliverable {
-    id: number;
-    title: string;
-    due_date: string;
-    office_type: string;
-    status: string;
-    mov_link?: string;
-    tags?: Tag[];
-}
+import type { Deliverable } from '@/lib/types';
 
 interface Props {
     isOpen: boolean;

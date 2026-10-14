@@ -1,21 +1,29 @@
 'use client';
 
-import { useState, type MouseEvent } from 'react';
+import { Suspense, useState, type MouseEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/axios';
 
-
+// useSearchParams() requires a Suspense boundary so the page can still be prerendered
 export default function EncodeDeliverable() {
+    return (
+        <Suspense>
+            <EncodeDeliverableForm />
+        </Suspense>
+    );
+}
+
+function EncodeDeliverableForm() {
 
     const searchParams = useSearchParams();
-    const initialTitle = searchParams.get('title') || '';
+    const initialTitle = searchParams.get('title') || ''; // Prefilled from the Ingestion Queue
     const initialLink = searchParams.get('link') || ''; // Catch the Google Drive URL
 
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
     // Core Deliverable State
-    const [title, setTitle] = useState('');
+    const [title, setTitle] = useState(initialTitle);
     const [officeType, setOfficeType] = useState('extension');
     const [dueDate, setDueDate] = useState('');
 

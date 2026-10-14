@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
+import type { Deliverable } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import DeliverableModal from '@/components/DeliverableModal'; // 1. Import the modal
 
 export default function VpDashboard() {
     const router = useRouter();
-    const [deliverables, setDeliverables] = useState<any[]>([]);
+    const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
     
     // 2. Add state for the modal
-    const [selectedDeliverable, setSelectedDeliverable] = useState<any | null>(null);
+    const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
@@ -34,7 +35,7 @@ export default function VpDashboard() {
         router.push('/');
     };
 
-    const openModal = (deliverable: any) => {
+    const openModal = (deliverable: Deliverable) => {
         setSelectedDeliverable(deliverable);
         setIsModalOpen(true);
     };

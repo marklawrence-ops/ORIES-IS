@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
+import type { Deliverable } from '@/lib/types';
 import PipelineTracker from '@/components/PipelineTracker';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
@@ -9,12 +10,12 @@ import Link from 'next/link';
 
 export default function HeadDashboard() {
     const router = useRouter();
-    const [deliverables, setDeliverables] = useState<any[]>([]);
+    const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
     const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
 
     // State for the MOV Upload Modal
     const [isMovModalOpen, setIsMovModalOpen] = useState(false);
-    const [selectedDeliverable, setSelectedDeliverable] = useState<any | null>(null);
+    const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null);
     const [additionalLink, setAdditionalLink] = useState('');
 
     useEffect(() => {
@@ -39,7 +40,7 @@ export default function HeadDashboard() {
     };
 
     // Open the MOV Modal
-    const openMovModal = (item: any) => {
+    const openMovModal = (item: Deliverable) => {
         setSelectedDeliverable(item);
         setAdditionalLink(''); // Reset input
         setIsMovModalOpen(true);
@@ -73,7 +74,7 @@ export default function HeadDashboard() {
     const activeDeliverables = deliverables.filter(d => d.status !== 'vp_approved');
     const completedDeliverables = deliverables.filter(d => d.status === 'vp_approved');
 
-    const renderDeliverables = (list: any[]) => {
+    const renderDeliverables = (list: Deliverable[]) => {
         if (list.length === 0) {
             return (
                 <div className="bg-gray-50 border-dashed border-2 border-gray-300 p-8 rounded-lg text-center text-gray-500">

@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import api from '@/lib/axios';
+import type { DriveFile } from '@/lib/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 
 export default function IngestionQueue() {
     const router = useRouter();
-    const [files, setFiles] = useState<any[]>([]);
+    const [files, setFiles] = useState<DriveFile[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 

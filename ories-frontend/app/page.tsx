@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { isAxiosError } from 'axios';
 import api from '@/lib/axios';
 
 export default function LoginPage() {
@@ -35,8 +36,8 @@ export default function LoginPage() {
                 router.push('/head/dashboard');
             }
 
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Authentication failed. Please check your credentials.');
+        } catch (err) {
+            setError((isAxiosError(err) && err.response?.data?.message) || 'Authentication failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }

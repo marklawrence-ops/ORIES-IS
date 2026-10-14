@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
+import type { Deliverable } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import DeliverableModal from '@/components/DeliverableModal';
 
 export default function DirectorDashboard() {
     const router = useRouter();
-    const [deliverables, setDeliverables] = useState<any[]>([]);
+    const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
     
     // Modal State
-    const [selectedDeliverable, setSelectedDeliverable] = useState<any | null>(null);
+    const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
@@ -38,7 +39,7 @@ export default function DirectorDashboard() {
         router.push('/');
     };
 
-    const openModal = (deliverable: any) => {
+    const openModal = (deliverable: Deliverable) => {
         setSelectedDeliverable(deliverable);
         setIsModalOpen(true);
     };

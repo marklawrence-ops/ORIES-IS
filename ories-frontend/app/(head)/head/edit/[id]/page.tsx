@@ -3,6 +3,7 @@
 import { useState, useEffect, type MouseEvent, use } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
+import type { Tag } from '@/lib/types';
 
 export default function EditDraft({ params }: { params: Promise<{ id: string }> }) {
     // 1. Unwrap the Promise to fix the Next.js Error!
@@ -30,12 +31,12 @@ export default function EditDraft({ params }: { params: Promise<{ id: string }> 
             
             // Map the database tags back to the frontend format
             if (res.data.tags) {
-                const existingTags = res.data.tags.map((t: any) => {
+                const existingTags = res.data.tags.map((t: Tag) => {
                     if (t.tagged_campus_id) return { type: 'campus', value: String(t.tagged_campus_id) };
                     if (t.tagged_department) return { type: 'department', value: t.tagged_department };
                     if (t.collaborator_name) return { type: 'faculty', value: t.collaborator_name };
                     return null;
-                }).filter(Boolean); // Remove any nulls
+                }).filter((t: { type: string; value: string } | null) => t !== null); // Remove any nulls
                 setTags(existingTags);
             }
             setLoading(false);

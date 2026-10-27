@@ -57,7 +57,7 @@ class DemoDataSeeder extends Seeder
             $u = $unit($campus, $code);
             $users[$email] = User::updateOrCreate(['email' => $email], [
                 'name' => $name,
-                'password' => 'password123',
+                'password' => config('ories.seed_password'),
                 'role' => 'faculty',
                 'employee_type' => $email === 'p.reyes@evsu.edu.ph' ? 'non_teaching' : 'teaching',
                 'position' => $email === 'p.reyes@evsu.edu.ph' ? 'Laboratory Technician' : 'Assistant Professor',
@@ -69,7 +69,7 @@ class DemoDataSeeder extends Seeder
 
         User::updateOrCreate(['email' => 'k.delosreyes@evsu.edu.ph'], [
             'name' => 'Ms. Karen B. Delos Reyes',
-            'password' => 'password123',
+            'password' => config('ories.seed_password'),
             'role' => 'faculty',
             'employee_type' => 'teaching',
             'position' => 'Instructor I',

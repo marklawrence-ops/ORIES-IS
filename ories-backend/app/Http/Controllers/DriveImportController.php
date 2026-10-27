@@ -26,6 +26,8 @@ class DriveImportController extends Controller
         return response()->json([
             'configured' => $this->drive->isConfigured(),
             'backup_enabled' => $this->drive->backupEnabled(),
+            'auth' => $this->drive->usesOAuth() ? 'oauth' : 'service_account',
+            'account' => $this->drive->account(),
             'attachments' => Attachment::selectRaw('drive_status, COUNT(*) as total, SUM(size) as bytes')
                 ->groupBy('drive_status')->get(),
             'local_bytes' => (int) Attachment::sum('size'),

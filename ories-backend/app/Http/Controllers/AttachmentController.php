@@ -5,17 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Attachment;
 use App\Services\MovStorage;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttachmentController extends Controller
 {
     public function __construct(private MovStorage $storage) {}
 
     /**
-     * Streams a Means of Verification from local storage. Files of unverified updates are
+     * Streams a Means of Verification from storage. Files of unverified updates are
      * restricted to the uploader's team and the verifiers.
      */
-    public function download(Request $request, Attachment $attachment): BinaryFileResponse
+    public function download(Request $request, Attachment $attachment): StreamedResponse
     {
         $user = $request->user();
         $project = $attachment->project;
@@ -26,15 +26,8 @@ class AttachmentController extends Controller
             : $project->canBeInspectedBy($user);
 
         abort_unless($allowed, 403);
+        abort_unless($this->storage->exists($attachment), 404, 'The file is missing from storage.');
 
-        $path = $this->storage->absolutePath($attachment);
-        abort_unless(is_file($path), 404, 'The file is missing from local storage.');
-
-        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
-
-        return response()->file($path, [
-            'Content-Type' => $attachment->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => $disposition.'; filename="'.addslashes($attachment->original_name).'"',
-        ]);
+        return $this->storage->response($attachment, $request->boolean('download') ? 'attachment' : 'inline');
     }
 }

@@ -34,7 +34,7 @@ class BackupAttachmentToDrive implements ShouldQueue
         }
 
         $fileId = $drive->upload(
-            $storage->absolutePath($attachment),
+            $storage->contents($attachment),
             $attachment->project_id.'-'.$attachment->id.'-'.$attachment->original_name,
             $attachment->mime_type,
         );

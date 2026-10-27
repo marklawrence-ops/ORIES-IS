@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seeds campuses, colleges, and one account per user tier.
-     * All seeded accounts use the password "password123".
+     * All seeded accounts use ORIES_SEED_PASSWORD (password123 unless set; always set it on a public server).
      */
     public function run(): void
     {
@@ -58,7 +58,7 @@ class DatabaseSeeder extends Seeder
         foreach ($accounts as [$email, $name, $role, $office, $position, $unitId]) {
             User::updateOrCreate(['email' => $email], [
                 'name' => $name,
-                'password' => 'password123',
+                'password' => config('ories.seed_password'),
                 'role' => $role,
                 'office' => $office,
                 'position' => $position,

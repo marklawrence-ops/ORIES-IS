@@ -11,6 +11,8 @@ import { Alert, Badge, Button, Card, Input, Loading, Modal, PageHeader } from '@
 interface StorageStatus {
     configured: boolean;
     backup_enabled: boolean;
+    auth: 'oauth' | 'service_account';
+    account: string | null;
     local_bytes: number;
     attachments: { drive_status: string; total: number; bytes: number | null }[];
 }
@@ -67,8 +69,12 @@ export default function StoragePage() {
                     <div className="space-y-3 text-sm">
                         <p>Local storage used: <strong>{formatBytes(status.data.local_bytes)}</strong></p>
                         <p>
-                            Google Drive: {status.data.configured ? <Badge tone="green">connected</Badge> : <Badge tone="gray">not configured</Badge>}{' '}
+                            Google Drive: {status.data.configured ? <Badge tone="green">set up</Badge> : <Badge tone="gray">not set up</Badge>}{' '}
                             · Automatic backup: {status.data.backup_enabled ? <Badge tone="green">on</Badge> : <Badge tone="gray">off</Badge>}
+                        </p>
+                        <p className="text-gray-600">
+                            Uploads as {status.data.account ? <strong>{status.data.account}</strong> : 'no account yet'}{' '}
+                            ({status.data.auth === 'oauth' ? 'Google account' : 'service account, Shared Drive required'})
                         </p>
                         <ul className="grid gap-2 sm:grid-cols-4">
                             {status.data.attachments.map((a) => (

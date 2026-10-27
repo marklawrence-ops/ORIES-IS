@@ -51,6 +51,65 @@ Artisan::command('ories:retry-drive-backups', function (GoogleDrive $drive) {
     $this->info("Queued {$ids->count()} attachment(s) for Google Drive backup.");
 })->purpose('Queue Google Drive backups for attachments that are not yet synced');
 
+Artisan::command('ories:drive-connect', function (GoogleDrive $drive) {
+    if (! $drive->usesOAuth()) {
+        $this->error('Set GOOGLE_DRIVE_AUTH=oauth in .env first; the service account mode needs no sign-in.');
+
+        return 1;
+    }
+
+    try {
+        $url = $drive->authorizationUrl();
+    } catch (Throwable $e) {
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    $this->line('1. Open this link and sign in with the Google account that should hold the backups:');
+    $this->newLine();
+    $this->line($url);
+    $this->newLine();
+    $this->line('2. Allow access. The browser then opens a "localhost" page that does not load; that is expected.');
+    $this->line('3. Copy the full address from the browser\'s address bar and paste it here.');
+
+    try {
+        $account = $drive->connect((string) $this->ask('Address (or just the code)'));
+    } catch (Throwable $e) {
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+
+    $this->info("Connected as {$account}. Run `php artisan ories:drive-check` to confirm the backup folder, then restart the queue worker.");
+})->purpose('Connect a regular Google account for Drive backups (GOOGLE_DRIVE_AUTH=oauth)');
+
+Artisan::command('ories:drive-check', function (GoogleDrive $drive) {
+    $this->line('Sign-in mode: '.($drive->usesOAuth() ? 'Google account (OAuth)' : 'service account'));
+    $this->line('Account: '.($drive->account() ?? 'none'));
+    $this->line('Automatic backup: '.(config('ories.drive.backup_enabled') ? 'on' : 'off'));
+
+    if (! $drive->isConfigured()) {
+        $this->error($drive->usesOAuth()
+            ? 'Not ready: set GOOGLE_DRIVE_FOLDER_ID and run `php artisan ories:drive-connect`.'
+            : 'Not ready: set GOOGLE_DRIVE_FOLDER_ID and add the service account file.');
+
+        return 1;
+    }
+
+    try {
+        $this->info('Backup folder "'.$drive->testBackupFolder().'" can be read and written. Backups will work.');
+    } catch (Throwable $e) {
+        $message = $e->getMessage();
+        $this->error('The backup folder cannot be used: '.$message);
+        if (str_contains($message, 'storageQuotaExceeded') || str_contains($message, 'do not have storage quota')) {
+            $this->line('A service account cannot store files in a personal My Drive. Use a Shared Drive folder, or set GOOGLE_DRIVE_AUTH=oauth and run `php artisan ories:drive-connect`.');
+        }
+
+        return 1;
+    }
+})->purpose('Test the Google Drive connection by writing and deleting a test file in the backup folder');
+
 Artisan::command('ories:evaluate-crosscheck {file=database/data/crosscheck_validation.csv}', function (string $file) {
     $rows = array_map('str_getcsv', file(base_path($file), FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));
     array_shift($rows);

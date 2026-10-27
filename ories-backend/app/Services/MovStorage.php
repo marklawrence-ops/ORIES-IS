@@ -10,10 +10,12 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Stores Means of Verification on the local (institution-controlled) disk first so the
- * system keeps working when cloud services are down, then queues a Google Drive backup.
+ * Stores Means of Verification on the institution's own disk first (ORIES_MOV_DISK: a local
+ * folder on a university server, or an object-storage bucket on a cloud host), then queues a
+ * Google Drive backup.
  */
 class MovStorage
 {
@@ -36,9 +38,27 @@ class MovStorage
         return $this->register($project, $update, $user, $path, $name, $mimeType, $source);
     }
 
-    public function absolutePath(Attachment $attachment): string
+    public function exists(Attachment $attachment): bool
     {
-        return Storage::disk($this->disk())->path($attachment->path);
+        return Storage::disk($this->disk())->exists($attachment->path);
+    }
+
+    public function contents(Attachment $attachment): string
+    {
+        return (string) Storage::disk($this->disk())->get($attachment->path);
+    }
+
+    /**
+     * Streams the file from whichever disk holds it (local folder or a cloud bucket).
+     */
+    public function response(Attachment $attachment, string $disposition): StreamedResponse
+    {
+        return Storage::disk($this->disk())->response(
+            $attachment->path,
+            $attachment->original_name,
+            ['Content-Type' => $attachment->mime_type ?: 'application/octet-stream'],
+            $disposition,
+        );
     }
 
     public function disk(): string

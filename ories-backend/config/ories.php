@@ -15,7 +15,14 @@ return [
     'drive' => [
         // Secondary cloud backup; uploads stay available locally when Drive is disabled or unreachable
         'backup_enabled' => (bool) env('GOOGLE_DRIVE_BACKUP_ENABLED', false),
+
+        // How the system signs in to Drive: 'service_account' (needs a Shared Drive) or 'oauth'
+        // (uploads into a regular Google account's My Drive after a one-time `php artisan ories:drive-connect`)
+        'auth' => env('GOOGLE_DRIVE_AUTH', 'service_account'),
         'credentials' => env('GOOGLE_DRIVE_CREDENTIALS', storage_path('app/google-credentials.json')),
+        'oauth_client' => env('GOOGLE_DRIVE_OAUTH_CLIENT', storage_path('app/google-oauth-client.json')),
+        'oauth_token' => env('GOOGLE_DRIVE_OAUTH_TOKEN', storage_path('app/google-oauth-token.json')),
+
         'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID'),
         'import_folder_id' => env('GOOGLE_DRIVE_IMPORT_FOLDER_ID', env('GOOGLE_DRIVE_FOLDER_ID')),
     ],
@@ -24,5 +31,8 @@ return [
     'stale_after_days' => (int) env('ORIES_STALE_AFTER_DAYS', 90),
 
     'mail_notifications' => (bool) env('ORIES_MAIL_NOTIFICATIONS', false),
+
+    // Password given to every seeded account; always override it on a server reachable from the Internet
+    'seed_password' => env('ORIES_SEED_PASSWORD', 'password123'),
 
 ];

@@ -58,16 +58,48 @@ The ORIES-IS settings (duplicate threshold, upload size, reminder interval, mail
 
 Uploaded Means of Verification are always stored locally in `storage/app/private/movs`. Google Drive is a secondary backup and the source for importing existing files, so the system works without it.
 
-* Ask the repository owner for the `google-credentials.json` service-account file and place it in `ories-backend/storage/app/`.
-* **Do not commit this file to version control.**
-* Use a **Shared Drive** folder for backups (service accounts cannot store files in a personal "My Drive") and share it with the service account as a Content Manager.
+The system can sign in to Drive in one of two ways, chosen with `GOOGLE_DRIVE_AUTH`. You can switch later by changing that line and restarting.
 
-```env
-GOOGLE_DRIVE_BACKUP_ENABLED=true
-GOOGLE_DRIVE_FOLDER_ID="shared_drive_backup_folder_id"
-GOOGLE_DRIVE_IMPORT_FOLDER_ID="existing_files_folder_id"
+**Option A: a regular Google account (`oauth`).** Backups go into that account's own My Drive. No Shared Drive needed.
 
-```
+1. In [Google Cloud Console](https://console.cloud.google.com/) (same project as before, Drive API enabled):
+   * **APIs & Services → OAuth consent screen:** set it up, add the Google account that will hold the backups as a test user, then choose **Publish app**. While the app stays in "Testing", Google expires the connection after 7 days.
+   * **APIs & Services → Credentials → Create credentials → OAuth client ID**, type **Desktop app**. Download the JSON and save it as `ories-backend/storage/app/google-oauth-client.json`.
+2. In `.env`:
+
+   ```env
+   GOOGLE_DRIVE_BACKUP_ENABLED=true
+   GOOGLE_DRIVE_AUTH=oauth
+   GOOGLE_DRIVE_FOLDER_ID="folder_id_in_that_accounts_my_drive"
+   GOOGLE_DRIVE_IMPORT_FOLDER_ID="existing_files_folder_id"
+
+   ```
+
+3. Connect the account once. The command prints a link; sign in, allow access, and paste back the address of the `localhost` page that opens (it does not load, which is expected):
+
+   ```bash
+   php artisan ories:drive-connect
+
+   ```
+
+   The connection is saved in `storage/app/google-oauth-token.json` and renews itself.
+
+**Option B: a service account (`service_account`, the default).** Backups go into a Shared Drive. This needs a Google Workspace account that can create Shared Drives.
+
+* Place the `google-credentials.json` service-account file in `ories-backend/storage/app/`.
+* Create a **Shared Drive**, add the service account's e-mail (`client_email` in the file) as a **Content manager**, and use a folder in it as `GOOGLE_DRIVE_FOLDER_ID`. Service accounts cannot store files in a personal My Drive.
+
+**For both options:**
+
+* **Do not commit** `google-credentials.json`, `google-oauth-client.json`, or `google-oauth-token.json`; `storage/app` is already ignored by Git.
+* Test the setup. It writes and deletes a small test file in the backup folder and explains any problem:
+
+  ```bash
+  php artisan ories:drive-check
+
+  ```
+
+* After changing `.env`, restart the backend and the queue worker, then send any failed backups again with `php artisan ories:retry-drive-backups`.
 
 ### 4. Database Setup & Seed Data
 
@@ -211,8 +243,64 @@ php artisan ories:evaluate-crosscheck
 
 ```
 
+## ☁️ Deploying (Laravel Cloud + Vercel)
+
+The backend goes to [Laravel Cloud](https://cloud.laravel.com) and the frontend to [Vercel](https://vercel.com), both from this GitHub repository. Deploy the backend first, because the frontend needs its address.
+
+### 1. Backend on Laravel Cloud
+
+1. **Create the application.** *New application* → connect GitHub → choose this repository. Cloud detects the monorepo; select **`ories-backend`** as the application directory. Pick the region closest to your users (Asia-Pacific).
+2. **Attach a database.** On the environment canvas, add a **Postgres** database. Cloud injects the `DB_*` variables.
+3. **Attach a bucket for the MOV files.** Add a **Laravel Object Storage** bucket: visibility **Private**, disk name **`movs`**. Cloud's own disk is erased on every deployment, so uploaded files must live in the bucket.
+4. **Environment variables** (environment → *Settings* → *Environment variables*):
+
+   ```env
+   APP_ENV=production
+   APP_DEBUG=false
+   ORIES_MOV_DISK=movs
+   ORIES_SEED_PASSWORD=choose-a-strong-password
+   FRONTEND_URL=https://your-app.vercel.app
+   CORS_ALLOWED_ORIGINS=*
+   QUEUE_CONNECTION=database
+   CACHE_STORE=database
+   MAIL_MAILER=log
+   GOOGLE_DRIVE_BACKUP_ENABLED=false
+
+   ```
+
+   Leave `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` as shown until the frontend exists (step 3 below).
+5. **Deploy commands:** make sure the deploy commands include `php artisan migrate --force`, then **Deploy**.
+6. **Load the demo data once:** environment → *Commands* → run
+
+   ```bash
+   php artisan db:seed --force
+
+   ```
+
+   Every seeded account gets the `ORIES_SEED_PASSWORD` you set, never `password123`. Run this only once; for real use, create accounts instead.
+7. **Scheduler:** turn on the **Scheduler** for the app compute so the weekly reminders run. A queue worker is only needed if you turn Google Drive backup on.
+8. Copy the environment's URL (for example `https://ories-backend-main-xxxx.laravel.cloud`). Check that `https://…laravel.cloud/api/lookups` returns JSON.
+
+### 2. Frontend on Vercel
+
+1. *Add New → Project* → import this repository.
+2. **Root Directory:** `ories-frontend` (Vercel detects Next.js).
+3. **Environment variable:** `NEXT_PUBLIC_API_URL` = `https://…laravel.cloud/api` (your backend URL from step 1.8, plus `/api`).
+4. **Deploy.** If you change `NEXT_PUBLIC_API_URL` later, redeploy, because it is built into the frontend.
+
+### 3. Connect the two
+
+Back on Laravel Cloud, set `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` to your Vercel address (for example `https://ories-is.vercel.app`, no trailing slash), then redeploy. The API now accepts requests only from your frontend.
+
+### Notes
+
+* **Google Drive backup** is off above because the bucket already keeps the files off the server. To turn it on, the credential files from *Google Drive (optional)* must be provided to the server; ask before enabling it.
+* Push to `main` and both platforms redeploy automatically.
+
 ## 🧰 Troubleshooting
 
 * **`Failed to listen on 127.0.0.1:8000 (reason: ?)`**: start the backend with `php artisan serve --no-reload` (see Backend step 5).
 * **`Another next dev server is already running`** or **`Port 3000 is in use`**: an earlier `npm run dev` is still running. Stop it with `Ctrl+C` in its terminal, or end the process with the PID shown in the message (`taskkill /PID <pid> /F`), then run `npm run dev` again.
 * **Login shows "Authentication failed" for every account**: the backend is not running, or the database has not been seeded yet (`php artisan migrate --seed`).
+* **Deployed site can't sign in, and the browser console shows a CORS error**: `CORS_ALLOWED_ORIGINS` on Laravel Cloud doesn't match the Vercel address exactly (check `https://` and no trailing slash), or the backend wasn't redeployed after changing it.
+* **Deployed site can't reach the API at all**: `NEXT_PUBLIC_API_URL` on Vercel is missing `/api`, points to the wrong address, or Vercel wasn't redeployed after setting it.

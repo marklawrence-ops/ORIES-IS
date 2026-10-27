@@ -31,7 +31,7 @@ export default function OrgChartPage() {
         <div>
             <PageHeader
                 title="ORIES Organizational Chart"
-                description="Built from live accounts. Click a box to expand or collapse it, a person to see their records, or a record count to open the matching list."
+                description="Built from live accounts. Click a box to expand or collapse it, a person to see their records, or a record count to open the matching list. (Placeholder data)"
             />
             <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white p-6">
                 <OrgBranch node={data} depth={0} onPerson={setPersonId} />

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import api, { errorMessage } from '@/lib/api';
 import { useApi, useLookups } from '@/lib/hooks';
@@ -15,15 +15,39 @@ import { Alert, Badge, Button, ButtonLink, Card, DeadlineBadge, Field, Input, Lo
 
 export default function ProjectDetailPage() {
     const { id } = useParams<{ id: string }>();
+    const searchParams = useSearchParams();
     const { data, error, loading, reload } = useApi<ProjectDetail>(`/projects/${id}`);
     const [modal, setModal] = useState<'update' | 'certificate' | null>(null);
+    const [notice, setNotice] = useState<{ tone: 'green' | 'red'; text: string } | null>(null);
+    const [withdrawing, setWithdrawing] = useState(false);
 
     if (loading && !data) return <Loading />;
     if (error || !data) return <Alert>{error ?? 'Record not found.'}</Alert>;
 
     const { project, updates, permissions, activity } = data;
     const pending = updates.find((u) => u.status === 'pending');
-    const returned = project.verification_status === 'returned' ? updates.find((u) => u.type === 'proposal' && u.status === 'returned') : null;
+    // A returned or withdrawn proposal goes back to the lead; only a return has reviewer remarks
+    const lastProposal = project.verification_status === 'returned' ? updates.find((u) => u.type === 'proposal') : null;
+    const returned = lastProposal?.status === 'returned' ? lastProposal : null;
+    const withdrawn = lastProposal?.status === 'withdrawn' ? lastProposal : null;
+
+    // Set when the reviewer arrives here from the previous item in the verification queue
+    const reviewed = searchParams.get('reviewed');
+    const queueNotice = reviewed && `Previous update ${reviewed === 'verify' ? 'verified' : 'returned'}. This is the next item in your queue (${searchParams.get('remaining')} waiting).`;
+
+    const withdraw = async () => {
+        if (!pending || !confirm(`Withdraw “${pending.summary}”? The record stays as it is, and you can submit again.`)) return;
+        setWithdrawing(true);
+        try {
+            await api.post(`/updates/${pending.id}/withdraw`);
+            setNotice({ tone: 'green', text: 'Update withdrawn. The record is unchanged, and you can submit again.' });
+            reload();
+        } catch (err) {
+            setNotice({ tone: 'red', text: errorMessage(err) });
+        } finally {
+            setWithdrawing(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -48,7 +72,10 @@ export default function ProjectDetailPage() {
                 </div>
             </div>
 
+            {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+            {!notice && queueNotice && pending && <Alert tone="green">{queueNotice}</Alert>}
             {returned && <Alert tone="amber"><strong>Returned for correction:</strong> {returned.review_remarks}</Alert>}
+            {withdrawn && permissions.can_resubmit && <Alert tone="amber">This proposal was withdrawn before review. Correct it and resubmit it for verification.</Alert>}
             {project.deadline && permissions.is_involved && !pending && (
                 <Alert tone={project.deadline === 'overdue' ? 'red' : 'amber'}>
                     {project.deadline === 'overdue'
@@ -57,12 +84,19 @@ export default function ProjectDetailPage() {
                 </Alert>
             )}
             {pending && permissions.is_involved && !permissions.can_verify && (
-                <Alert tone="blue">“{pending.summary}” is awaiting verification by the ORIES {project.office} office. The record changes once it is verified.</Alert>
+                <Alert tone="blue">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>“{pending.summary}” is awaiting verification by the ORIES {project.office} office. The record changes once it is verified.</span>
+                        {permissions.can_withdraw && (
+                            <Button variant="secondary" disabled={withdrawing} onClick={withdraw}>{withdrawing ? 'Withdrawing…' : 'Withdraw submission'}</Button>
+                        )}
+                    </div>
+                </Alert>
             )}
 
             {pending && permissions.can_verify && (
                 <Card title="Verification required" className="border-amber-300">
-                    <ReviewPanel update={pending} onDone={reload} />
+                    <ReviewPanel update={pending} onDone={(text) => { setNotice({ tone: 'green', text }); reload(); }} />
                 </Card>
             )}
 
@@ -124,7 +158,7 @@ export default function ProjectDetailPage() {
                         <ol className="relative space-y-5 border-l border-gray-200 pl-5">
                             {updates.map((u) => (
                                 <li key={u.id} className="relative">
-                                    <span className={`absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white ${u.status === 'verified' ? 'bg-green-500' : u.status === 'returned' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                                    <span className={`absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white ${u.status === 'verified' ? 'bg-green-500' : u.status === 'returned' ? 'bg-red-500' : u.status === 'withdrawn' ? 'bg-gray-400' : 'bg-amber-400'}`} />
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-medium text-gray-900">{u.summary}</span>
                                         <VerificationBadge status={u.status} />

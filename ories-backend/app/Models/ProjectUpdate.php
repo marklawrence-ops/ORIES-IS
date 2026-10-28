@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class ProjectUpdate extends Model
 {
     public const TYPES = ['proposal', 'stage', 'outcome', 'details'];
+
+    // A submitter may withdraw a pending update; it then leaves the queue without changing the record
+    public const STATUSES = ['pending', 'verified', 'returned', 'withdrawn'];
 
     // Plain names for the fields a change of details can touch
     public const DETAIL_LABELS = [
@@ -65,6 +70,36 @@ class ProjectUpdate extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(Attachment::class);
+    }
+
+    /**
+     * Pending updates in the user's verification queue (their office, or every office).
+     */
+    public function scopeInQueueOf(Builder $query, User $user): Builder
+    {
+        return $query->where('status', 'pending')
+            ->whereHas('project', fn (Builder $q) => $user->office ? $q->where('office', $user->office) : $q);
+    }
+
+    /**
+     * Pending updates that have waited longer than the verification window.
+     */
+    public function scopeWaitingTooLong(Builder $query): Builder
+    {
+        return $query->where('status', 'pending')->where('created_at', '<', self::waitingCutoff());
+    }
+
+    /**
+     * Submissions made before this moment have waited more than `verify_within_days` working days.
+     */
+    public static function waitingCutoff(): Carbon
+    {
+        return now()->subWeekdays(config('ories.verify_within_days'));
+    }
+
+    public function waitingDays(): int
+    {
+        return (int) $this->created_at->diffInWeekdays(now());
     }
 
     public function summary(): string

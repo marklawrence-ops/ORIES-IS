@@ -132,9 +132,14 @@ class DashboardController extends Controller
         if ($user->hasRole('staff', 'director')) {
             $tasks[] = [
                 'label' => 'Updates awaiting verification',
-                'value' => ProjectUpdate::where('status', 'pending')
-                    ->whereHas('project', fn (Builder $q) => $user->office ? $q->where('office', $user->office) : $q)->count(),
+                'value' => ProjectUpdate::inQueueOf($user)->count(),
                 'link' => '/verification',
+            ];
+            $tasks[] = [
+                'label' => 'Waiting more than '.config('ories.verify_within_days').' working days',
+                'value' => ProjectUpdate::inQueueOf($user)->waitingTooLong()->count(),
+                'link' => '/verification',
+                'tone' => 'red',
             ];
         }
         if ($user->hasRole('director')) {

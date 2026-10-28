@@ -18,7 +18,7 @@ export default function VerificationQueuePage() {
     const { user, hasRole } = useAuth();
     const [status, setStatus] = useState<(typeof TABS)[number]['key']>('pending');
     const [page, setPage] = useState(1);
-    const { data, error, loading } = useApi<Paginated<ProjectUpdate>>(hasRole('staff', 'director') ? '/verification' : null, { status, page });
+    const { data, error, loading } = useApi<Paginated<ProjectUpdate> & { verify_within_days: number; waiting_too_long: number }>(hasRole('staff', 'director') ? '/verification' : null, { status, page });
 
     if (!hasRole('staff', 'director')) return <Alert>Only ORIES staff and directors verify submissions.</Alert>;
 
@@ -26,7 +26,7 @@ export default function VerificationQueuePage() {
         <div>
             <PageHeader
                 title="Verification Queue"
-                description={`Every proposal, stage change, and outcome is checked against its Means of Verification before it counts in reports. Showing: ${user.office ? `${OFFICE_LABELS[user.office]} office` : 'all offices'}.`}
+                description={`Every proposal, stage change, outcome, and change of details is checked against its Means of Verification before it counts in reports. Showing: ${user.office ? `${OFFICE_LABELS[user.office]} office` : 'all offices'}.`}
             />
             <div className="mb-4 flex gap-1 border-b border-gray-200">
                 {TABS.map((tab) => (
@@ -41,6 +41,11 @@ export default function VerificationQueuePage() {
             </div>
 
             {error && <Alert>{error}</Alert>}
+            {status === 'pending' && !!data?.waiting_too_long && (
+                <div className="mb-4">
+                    <Alert>{data.waiting_too_long} submission(s) have waited more than {data.verify_within_days} working days. They are marked below; the oldest are listed first.</Alert>
+                </div>
+            )}
             {loading && !data ? <Loading /> : data && data.data.length === 0 ? (
                 <EmptyState>{status === 'pending' ? 'Nothing is waiting for verification.' : 'No submissions in this list yet.'}</EmptyState>
             ) : data && (
@@ -48,7 +53,7 @@ export default function VerificationQueuePage() {
                     <ul className="space-y-3">
                         {data.data.map((u) => (
                             <li key={u.id}>
-                                <Link href={`/projects/${u.project_id}`} className="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-brand-500">
+                                <Link href={`/projects/${u.project_id}`} className={`block rounded-lg border bg-white p-4 shadow-sm hover:border-brand-500 ${u.waiting_too_long ? 'border-red-300 border-l-4 border-l-red-500' : 'border-gray-200'}`}>
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div>
                                             <p className="font-medium text-gray-900">{u.project?.title}</p>
@@ -58,6 +63,11 @@ export default function VerificationQueuePage() {
                                         <div className="flex flex-col items-end gap-1 text-xs text-gray-500">
                                             {u.project && <OfficeBadge office={u.project.office} />}
                                             {!!u.duplicate_matches?.length && <Badge tone="amber">Possible duplicate title</Badge>}
+                                            {u.waiting_days != null && (
+                                                <Badge tone={u.waiting_too_long ? 'red' : 'gray'}>
+                                                    {u.waiting_days === 0 ? 'Submitted today' : `Waiting ${u.waiting_days} working day${u.waiting_days === 1 ? '' : 's'}`}
+                                                </Badge>
+                                            )}
                                             <span>{status === 'pending' ? `Submitted ${formatDate(u.created_at, true)}` : `Reviewed ${formatDate(u.reviewed_at, true)} by ${u.reviewer?.name ?? ''}`}</span>
                                         </div>
                                     </div>

@@ -1,4 +1,4 @@
-import type { Office, Role, Stage, VerificationStatus } from './types';
+import type { Office, Role, Stage, UpdateStatus } from './types';
 
 // Role names for pickers; use roleLabel() to describe a specific person
 export const ROLE_LABELS: Record<Role, string> = {
@@ -32,10 +32,11 @@ export const STAGE_LABELS: Record<Stage, string> = {
     terminated: 'Terminated',
 };
 
-export const VERIFICATION_LABELS: Record<VerificationStatus, string> = {
+export const VERIFICATION_LABELS: Record<UpdateStatus, string> = {
     pending: 'Awaiting verification',
     verified: 'Verified',
     returned: 'Returned for correction',
+    withdrawn: 'Withdrawn',
 };
 
 export const OUTCOME_LABELS: Record<string, string> = {

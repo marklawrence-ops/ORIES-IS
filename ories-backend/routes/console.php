@@ -3,6 +3,8 @@
 use App\Jobs\BackupAttachmentToDrive;
 use App\Models\Attachment;
 use App\Models\Project;
+use App\Models\ProjectUpdate;
+use App\Models\User;
 use App\Services\DuplicateTitleChecker;
 use App\Services\GoogleDrive;
 use App\Services\Notifier;
@@ -61,6 +63,30 @@ Artisan::command('ories:remind-deadlines', function (Notifier $notifier) {
 
     $this->info("Sent {$overdue->count()} overdue and {$endingSoon->count()} ending-soon reminder(s).");
 })->purpose('Remind leads of ongoing records that are past or near their end date');
+
+Artisan::command('ories:remind-verifiers', function (Notifier $notifier) {
+    $days = (int) config('ories.verify_within_days');
+
+    // One notice per verifier, counting only the offices they verify
+    $verifiers = User::query()->whereIn('role', ['staff', 'director'])->where('status', 'active')->get();
+    $reminded = 0;
+    foreach ($verifiers as $verifier) {
+        $waiting = ProjectUpdate::inQueueOf($verifier)->waitingTooLong()->count();
+        if ($waiting === 0) {
+            continue;
+        }
+
+        $notifier->send(
+            $verifier,
+            'Submissions waiting for verification',
+            $waiting.' submission(s) in your queue have waited more than '.$days.' working days.',
+            '/verification',
+        );
+        $reminded++;
+    }
+
+    $this->info("Reminded {$reminded} verifier(s).");
+})->purpose('Remind verifiers of submissions waiting longer than the verification window');
 
 Artisan::command('ories:retry-drive-backups', function (GoogleDrive $drive) {
     if (! $drive->backupEnabled()) {
@@ -190,4 +216,5 @@ Artisan::command('ories:evaluate-crosscheck {file=database/data/crosscheck_valid
 
 Schedule::command('ories:remind-stale')->weeklyOn(1, '8:00');
 Schedule::command('ories:remind-deadlines')->weeklyOn(1, '8:00');
+Schedule::command('ories:remind-verifiers')->weekdays()->at('8:00');
 Schedule::command('ories:retry-drive-backups')->hourly();

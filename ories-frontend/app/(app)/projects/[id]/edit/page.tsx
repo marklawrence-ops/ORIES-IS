@@ -14,7 +14,9 @@ export default function ResubmitProposalPage() {
     if (error || !data) return <Alert>{error ?? 'Record not found.'}</Alert>;
     if (!data.permissions.can_resubmit) return <Alert>Only the lead can edit a proposal, and only after it is returned for correction.</Alert>;
 
-    const lastReturn = data.updates.find((u) => u.type === 'proposal' && u.status === 'returned');
+    // The latest proposal submission; a withdrawn one has no reviewer remarks to show
+    const lastProposal = data.updates.find((u) => u.type === 'proposal');
+    const lastReturn = lastProposal?.status === 'returned' ? lastProposal : null;
 
     return (
         <div className="mx-auto max-w-4xl">

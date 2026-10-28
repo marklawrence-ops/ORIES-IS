@@ -157,6 +157,7 @@ class ProjectController extends Controller
                 'can_change_details' => $project->lead_id === $user->id
                     && $project->verification_status === 'verified'
                     && ! $project->hasPendingUpdate(),
+                'can_withdraw' => $project->updates()->where('status', 'pending')->where('submitted_by', $user->id)->exists(),
                 'can_resubmit' =>$project->lead_id === $user->id && $project->verification_status === 'returned',
                 'can_request_certificate' => $canRequest = $project->isInvolved($user) && $project->verification_status === 'verified',
                 // Each certificate type with the reason it can't be requested yet (null = available)
@@ -347,6 +348,33 @@ class ProjectController extends Controller
         $this->notifyVerifiers($project, 'Update awaiting verification', $update->summary().' — '.$project->title);
 
         return response()->json(['message' => 'Changes submitted for verification.', 'update' => $update], 201);
+    }
+
+    /**
+     * The submitter takes back an update still awaiting verification (e.g., the wrong file was attached).
+     * The record stays as it is; a withdrawn proposal goes back to the lead to correct and resubmit.
+     */
+    public function withdrawUpdate(Request $request, ProjectUpdate $update): JsonResponse
+    {
+        $user = $request->user();
+        $project = $update->project;
+        abort_unless($update->submitted_by === $user->id, 403, 'Only the person who submitted this update can withdraw it.');
+        abort_unless($update->status === 'pending', 422, 'Only an update awaiting verification can be withdrawn.');
+
+        DB::transaction(function () use ($update, $project, $user) {
+            // Shares the verifiers' row lock, so a withdrawal and a review cannot both go through
+            $status = ProjectUpdate::whereKey($update->id)->lockForUpdate()->value('status');
+            abort_unless($status === 'pending', 422, 'Only an update awaiting verification can be withdrawn.');
+
+            $update->update(['status' => 'withdrawn']);
+            if ($update->type === 'proposal') {
+                $project->update(['verification_status' => 'returned']);
+            }
+
+            ActivityLog::record($project, $user, 'withdrawn', $update->summary().' withdrawn by the submitter.');
+        });
+
+        return response()->json(['message' => 'Update withdrawn.']);
     }
 
     /**

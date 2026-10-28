@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { formatDate, OFFICE_LABELS, STAGE_LABELS, VERIFICATION_LABELS } from '@/lib/format';
-import type { Office, Stage, VerificationStatus } from '@/lib/types';
+import type { Office, Stage, UpdateStatus } from '@/lib/types';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -74,8 +74,8 @@ export function StageBadge({ stage }: { stage: Stage }) {
     return <Badge tone={tone[stage]}>{STAGE_LABELS[stage]}</Badge>;
 }
 
-export function VerificationBadge({ status }: { status: VerificationStatus }) {
-    const tone = { pending: 'amber', verified: 'green', returned: 'red' } as const;
+export function VerificationBadge({ status }: { status: UpdateStatus }) {
+    const tone = { pending: 'amber', verified: 'green', returned: 'red', withdrawn: 'gray' } as const;
     return <Badge tone={tone[status]}>{VERIFICATION_LABELS[status]}</Badge>;
 }
 

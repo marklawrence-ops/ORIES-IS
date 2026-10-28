@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Project extends Model
 {
@@ -299,5 +300,22 @@ class Project extends Model
     public function hasPendingUpdate(): bool
     {
         return $this->updates()->where('status', 'pending')->exists();
+    }
+
+    /**
+     * The lead and every member with an account, who are all told when an update is decided.
+     *
+     * @return Collection<int, User>
+     */
+    public function team(): Collection
+    {
+        // Reloaded, since a verified change of details may have just replaced the members
+        $this->load('lead', 'members.user');
+
+        return collect([$this->lead])
+            ->merge($this->members->pluck('user'))
+            ->filter()
+            ->unique('id')
+            ->values();
     }
 }

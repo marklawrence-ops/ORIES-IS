@@ -33,6 +33,9 @@ return [
     // Ongoing records ending within this many days are flagged as "ending soon" on dashboards and lists
     'ending_soon_days' => (int) env('ORIES_ENDING_SOON_DAYS', 30),
 
+    // Submissions waiting longer than this many working days are highlighted and remind the verifiers
+    'verify_within_days' => (int) env('ORIES_VERIFY_WITHIN_DAYS', 5),
+
     'mail_notifications' => (bool) env('ORIES_MAIL_NOTIFICATIONS', false),
 
     // Password given to every seeded account; always override it on a server reachable from the Internet

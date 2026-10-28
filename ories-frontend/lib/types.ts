@@ -2,6 +2,8 @@ export type Role = 'faculty' | 'head' | 'staff' | 'director' | 'vp' | 'oup';
 export type Office = 'research' | 'innovation' | 'extension';
 export type Stage = 'proposal' | 'ongoing' | 'completed' | 'terminated';
 export type VerificationStatus = 'pending' | 'verified' | 'returned';
+// An update can also be withdrawn by its submitter before review
+export type UpdateStatus = VerificationStatus | 'withdrawn';
 export type OutcomeType = 'publication' | 'presentation' | 'commercialization' | 'policy' | 'technology_transfer';
 
 export interface Unit {
@@ -119,7 +121,7 @@ export interface ProjectUpdate {
     data: (Partial<ProjectOutcome> & { date?: string } & DetailChanges) | null;
     remarks: string | null;
     duplicate_matches: DuplicateMatch[] | null;
-    status: VerificationStatus;
+    status: UpdateStatus;
     review_remarks: string | null;
     reviewed_at: string | null;
     created_at: string;
@@ -129,6 +131,9 @@ export interface ProjectUpdate {
     attachments?: Attachment[];
     attachments_hidden?: boolean;
     attachments_count?: number;
+    // Sent by the verification queue for pending items
+    waiting_days?: number;
+    waiting_too_long?: boolean;
     project?: Pick<Project, 'id' | 'title' | 'office' | 'stage' | 'verification_status'> & {
         campus?: Campus | null;
         unit?: Unit | null;
@@ -201,6 +206,7 @@ export interface ProjectDetail {
         can_verify: boolean;
         can_submit_update: boolean;
         can_change_details: boolean;
+        can_withdraw: boolean;
         can_resubmit: boolean;
         can_request_certificate: boolean;
         // Each certificate type with the reason it can't be requested now (null = available)

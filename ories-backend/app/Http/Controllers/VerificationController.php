@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\ProjectUpdate;
+use App\Models\User;
 use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,9 +34,18 @@ class VerificationController extends Controller
             ->orderBy('id', $status === 'pending' ? 'asc' : 'desc')
             ->paginate(20);
 
-        $updates->getCollection()->transform(fn (ProjectUpdate $u) => [...$u->toArray(), 'summary' => $u->summary()]);
+        $cutoff = ProjectUpdate::waitingCutoff();
+        $updates->getCollection()->transform(fn (ProjectUpdate $u) => [
+            ...$u->toArray(),
+            'summary' => $u->summary(),
+            ...($status === 'pending' ? ['waiting_days' => $u->waitingDays(), 'waiting_too_long' => $u->created_at->lt($cutoff)] : []),
+        ]);
 
-        return response()->json($updates);
+        return response()->json([
+            ...$updates->toArray(),
+            'verify_within_days' => (int) config('ories.verify_within_days'),
+            'waiting_too_long' => ProjectUpdate::inQueueOf($user)->waitingTooLong()->count(),
+        ]);
     }
 
     public function verify(Request $request, ProjectUpdate $update): JsonResponse
@@ -43,7 +53,7 @@ class VerificationController extends Controller
         $user = $request->user();
         $project = $update->project;
         abort_unless($user->canVerify($project->office), 403);
-        abort_unless($update->status === 'pending', 422, 'This update has already been reviewed.');
+        abort_unless($update->status === 'pending', 422, 'This update is no longer awaiting verification.');
 
         $remarks = $request->validate(['remarks' => 'nullable|string|max:2000'])['remarks'] ?? null;
 
@@ -72,14 +82,15 @@ class VerificationController extends Controller
             ActivityLog::record($project, $user, 'verified', $update->summary().' verified.');
         });
 
+        // The whole team hears about it, not only the person who submitted
         $this->notifier->send(
-            $update->submitter,
+            $project->team()->push($update->submitter),
             'Update verified',
             $update->summary().' — '.$project->title,
             '/projects/'.$project->id,
         );
 
-        return response()->json(['message' => 'Update verified and applied to the record.']);
+        return response()->json(['message' => 'Update verified and applied to the record.', 'next' => $this->next($user)]);
     }
 
     public function return(Request $request, ProjectUpdate $update): JsonResponse
@@ -87,7 +98,7 @@ class VerificationController extends Controller
         $user = $request->user();
         $project = $update->project;
         abort_unless($user->canVerify($project->office), 403);
-        abort_unless($update->status === 'pending', 422, 'This update has already been reviewed.');
+        abort_unless($update->status === 'pending', 422, 'This update is no longer awaiting verification.');
 
         $remarks = $request->validate(['remarks' => 'required|string|max:2000'], [
             'remarks.required' => 'Explain what needs to be corrected.',
@@ -111,22 +122,34 @@ class VerificationController extends Controller
         });
 
         $this->notifier->send(
-            $update->submitter,
+            $project->team()->push($update->submitter),
             'Update returned for correction',
-            $update->summary().' — '.$remarks,
+            $update->summary().' — '.$project->title.' — '.$remarks,
             '/projects/'.$project->id,
         );
 
-        return response()->json(['message' => 'Update returned to the submitter.']);
+        return response()->json(['message' => 'Update returned to the submitter.', 'next' => $this->next($user)]);
     }
 
     /**
-     * Re-checks the status under a row lock so two reviewers acting at once cannot both apply the update.
+     * The oldest item still in the reviewer's queue, so the page can open it right away.
+     */
+    private function next(User $user): ?array
+    {
+        $queue = ProjectUpdate::inQueueOf($user);
+        $next = (clone $queue)->orderBy('created_at')->orderBy('id')->first(['id', 'project_id']);
+
+        return $next ? ['project_id' => $next->project_id, 'remaining' => $queue->count()] : null;
+    }
+
+    /**
+     * Re-checks the status under a row lock so two reviewers acting at once (or a reviewer and a
+     * withdrawing submitter) cannot both decide the update.
      */
     private function lockPending(ProjectUpdate $update): void
     {
         $status = ProjectUpdate::whereKey($update->id)->lockForUpdate()->value('status');
-        abort_unless($status === 'pending', 422, 'This update has already been reviewed.');
+        abort_unless($status === 'pending', 422, 'This update is no longer awaiting verification.');
     }
 
     /**

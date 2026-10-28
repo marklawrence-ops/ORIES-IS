@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
-import { OFFICE_LABELS, STAGE_LABELS, VERIFICATION_LABELS } from '@/lib/format';
+import { formatDate, OFFICE_LABELS, STAGE_LABELS, VERIFICATION_LABELS } from '@/lib/format';
 import type { Office, Stage, VerificationStatus } from '@/lib/types';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -77,6 +77,13 @@ export function StageBadge({ stage }: { stage: Stage }) {
 export function VerificationBadge({ status }: { status: VerificationStatus }) {
     const tone = { pending: 'amber', verified: 'green', returned: 'red' } as const;
     return <Badge tone={tone[status]}>{VERIFICATION_LABELS[status]}</Badge>;
+}
+
+export function DeadlineBadge({ deadline, endDate }: { deadline?: 'overdue' | 'ending_soon' | null; endDate?: string | null }) {
+    if (!deadline) return null;
+    return deadline === 'overdue'
+        ? <Badge tone="red">Past end date{endDate ? ` (${formatDate(endDate)})` : ''}</Badge>
+        : <Badge tone="amber">Ends {endDate ? formatDate(endDate) : 'soon'}</Badge>;
 }
 
 export function OfficeBadge({ office }: { office: Office }) {

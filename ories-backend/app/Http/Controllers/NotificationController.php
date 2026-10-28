@@ -14,7 +14,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'unread' => $user->notifications()->whereNull('read_at')->count(),
-            'items' => $user->notifications()->latest()->limit(30)->get(),
+            'items' => $user->notifications()->latest()->orderByDesc('id')->limit(30)->get(),
         ]);
     }
 

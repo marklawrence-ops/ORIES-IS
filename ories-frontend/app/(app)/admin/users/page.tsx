@@ -5,7 +5,7 @@ import { Suspense, useState, type FormEvent } from 'react';
 import api, { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi, useLookups } from '@/lib/hooks';
-import { OFFICE_LABELS, ROLE_LABELS } from '@/lib/format';
+import { OFFICE_LABELS, ROLE_LABELS, roleLabel } from '@/lib/format';
 import type { Paginated, Role, UserAccount } from '@/lib/types';
 import { Alert, Badge, Button, Field, Input, Loading, Modal, PageHeader, Pagination, Select } from '@/components/ui';
 
@@ -67,7 +67,7 @@ function UserAdmin() {
                                 {data.data.map((u) => (
                                     <tr key={u.id}>
                                         <td className="px-4 py-3"><p className="font-medium">{u.name}</p><p className="text-xs text-gray-500">{u.email}</p></td>
-                                        <td className="px-4 py-3">{ROLE_LABELS[u.role]}{u.office ? ` · ${OFFICE_LABELS[u.office]}` : ''}{u.employee_type === 'non_teaching' ? ' (non-teaching)' : ''}</td>
+                                        <td className="px-4 py-3">{roleLabel(u.role, u.office)}{u.employee_type === 'non_teaching' ? ' (non-teaching)' : ''}</td>
                                         <td className="px-4 py-3 text-gray-600">{[u.campus?.name, u.unit?.code ?? u.unit?.name].filter(Boolean).join(' · ') || '—'}</td>
                                         <td className="px-4 py-3"><Badge tone={u.status === 'active' ? 'green' : u.status === 'pending' ? 'amber' : 'gray'}>{u.status}</Badge></td>
                                         <td className="space-x-2 px-4 py-3 text-right">

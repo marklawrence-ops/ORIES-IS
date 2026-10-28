@@ -8,7 +8,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectUpdate extends Model
 {
-    public const TYPES = ['proposal', 'stage', 'outcome'];
+    public const TYPES = ['proposal', 'stage', 'outcome', 'details'];
+
+    // Plain names for the fields a change of details can touch
+    public const DETAIL_LABELS = [
+        'title' => 'title',
+        'abstract' => 'abstract',
+        'keywords' => 'keywords',
+        'funding_source' => 'funding source',
+        'budget' => 'budget',
+        'start_date' => 'start date',
+        'end_date' => 'end date',
+        'members' => 'members',
+        'tags' => 'contributor tags',
+    ];
 
     protected $fillable = [
         'project_id',
@@ -60,6 +73,8 @@ class ProjectUpdate extends Model
             'proposal' => 'New proposal',
             'stage' => 'Stage update: '.ucfirst((string) $this->from_stage).' → '.ucfirst((string) $this->to_stage),
             'outcome' => 'New outcome: '.str_replace('_', ' ', (string) ($this->data['type'] ?? 'outcome')),
+            'details' => 'Change of details: '.collect([...array_keys($this->data['fields'] ?? []), ...array_keys(collect($this->data)->only(['members', 'tags'])->all())])
+                ->map(fn (string $key) => self::DETAIL_LABELS[$key] ?? $key)->join(', '),
             default => 'Update',
         };
     }

@@ -28,9 +28,10 @@ class DashboardController extends Controller
 
         $stats = [
             $this->stat('records', 'Verified records', $byStage->sum(), ['verification_status' => 'verified']),
-            $this->stat('proposals', 'Proposals', (int) ($byStage['proposal'] ?? 0), ['stage' => 'proposal']),
-            $this->stat('ongoing', 'Ongoing', (int) ($byStage['ongoing'] ?? 0), ['stage' => 'ongoing']),
-            $this->stat('completed', 'Completed', (int) ($byStage['completed'] ?? 0), ['stage' => 'completed']),
+            // The figures count verified records, so their drill-down lists must filter the same way
+            $this->stat('proposals', 'Proposals', (int) ($byStage['proposal'] ?? 0), ['stage' => 'proposal', 'verification_status' => 'verified']),
+            $this->stat('ongoing', 'Ongoing', (int) ($byStage['ongoing'] ?? 0), ['stage' => 'ongoing', 'verification_status' => 'verified']),
+            $this->stat('completed', 'Completed', (int) ($byStage['completed'] ?? 0), ['stage' => 'completed', 'verification_status' => 'verified']),
             $this->stat('publications', 'Publications', $outcomes()->where('type', 'publication')->count(), ['outcome' => 'publication']),
             $this->stat('scopus', 'Scopus-indexed', $outcomes()->where('type', 'publication')->where('indexing', 'scopus')->count(), ['outcome' => 'publication', 'indexing' => 'scopus']),
             $this->stat('commercialization', 'Commercialized', $outcomes()->where('type', 'commercialization')->count(), ['outcome' => 'commercialization']),
@@ -64,8 +65,10 @@ class DashboardController extends Controller
                 ->get(),
             'trend' => $this->trend($user),
             'tasks' => $this->tasks($user),
+            // Submitters also see their own pending records; everyone else sees only verified ones
             'recent' => Project::query()->visibleTo($user)->withinScopeOf($user)
-                ->with('lead:id,name')->latest('updated_at')->limit(6)
+                ->when(! $user->canSubmit(), fn (Builder $q) => $q->verified())
+                ->with('lead:id,name')->latest('updated_at')->orderByDesc('id')->limit(6)
                 ->get(['id', 'title', 'office', 'stage', 'verification_status', 'lead_id', 'updated_at']),
         ]);
     }
@@ -150,19 +153,33 @@ class DashboardController extends Controller
             ];
         }
         if ($user->canSubmit()) {
-            $mine = Project::query()->involving($user);
+            // Counted with the same queries the linked lists use, so each tile matches what it opens
             $tasks[] = [
-                'label' => 'My updates awaiting verification',
-                'value' => ProjectUpdate::where('status', 'pending')->whereIn('project_id', (clone $mine)->select('id'))->count(),
-                'link' => '/projects?scope=mine',
+                'label' => 'My records awaiting verification',
+                'value' => Project::query()->involving($user)->awaitingVerification()->count(),
+                'link' => '/projects?scope=mine&activity=awaiting',
             ];
             $tasks[] = [
                 'label' => 'My records returned for correction',
-                'value' => ProjectUpdate::where('status', 'returned')->where('submitted_by', $user->id)
-                    ->where('reviewed_at', '>=', now()->subDays(30))->count(),
-                'link' => '/projects?scope=mine',
+                'value' => Project::query()->involving($user)->returnedForCorrection()->count(),
+                'link' => '/projects?scope=mine&activity=returned',
             ];
         }
+
+        // Deadline monitoring: faculty see their own records, everyone else their area of responsibility
+        $deadlineScope = $user->hasRole('faculty') ? 'mine' : 'responsibility';
+        $deadlineQuery = fn () => $user->hasRole('faculty') ? Project::query()->involving($user) : Project::query()->withinScopeOf($user);
+        $tasks[] = [
+            'label' => $user->hasRole('faculty') ? 'My ongoing records past their end date' : 'Ongoing records past their end date',
+            'value' => $deadlineQuery()->pastEndDate()->count(),
+            'link' => "/projects?scope={$deadlineScope}&deadline=overdue",
+            'tone' => 'red',
+        ];
+        $tasks[] = [
+            'label' => ($user->hasRole('faculty') ? 'My records' : 'Records').' ending within '.config('ories.ending_soon_days').' days',
+            'value' => $deadlineQuery()->endingSoon()->count(),
+            'link' => "/projects?scope={$deadlineScope}&deadline=ending_soon",
+        ];
 
         return $tasks;
     }

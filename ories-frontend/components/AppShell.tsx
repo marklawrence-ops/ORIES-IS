@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import api from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { formatDate, OFFICE_LABELS, ROLE_LABELS } from '@/lib/format';
+import { formatDate, roleLabel } from '@/lib/format';
 import type { NotificationItem, Role } from '@/lib/types';
 
 interface NavItem {
@@ -86,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="border-t border-brand-800 px-5 py-4 text-xs text-brand-100">
                 <p className="font-semibold text-white">{user.name}</p>
-                <p>{ROLE_LABELS[user.role]}{user.office ? ` · ${OFFICE_LABELS[user.office]}` : ''}</p>
+                <p>{roleLabel(user.role, user.office)}</p>
                 {user.unit && <p className="truncate">{user.unit.name}</p>}
                 <div className="mt-3 flex gap-3">
                     <Link href="/account" className="underline hover:text-white">Account</Link>

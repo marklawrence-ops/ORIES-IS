@@ -7,9 +7,29 @@ import { useAuth } from '@/lib/auth';
 import { useApi, useLookups } from '@/lib/hooks';
 import { formatDate, INDEXING_LABELS, OFFICE_LABELS, OUTCOME_LABELS, STAGE_LABELS } from '@/lib/format';
 import type { Paginated, Project } from '@/lib/types';
-import { Alert, Button, ButtonLink, Card, EmptyState, Input, Loading, OfficeBadge, PageHeader, Pagination, Select, StageBadge, VerificationBadge } from '@/components/ui';
+import { Alert, Button, ButtonLink, Card, DeadlineBadge, EmptyState, Input, Loading, OfficeBadge, PageHeader, Pagination, Select, StageBadge, VerificationBadge } from '@/components/ui';
 
-const FILTER_KEYS = ['q', 'scope', 'office', 'stage', 'verification_status', 'campus_id', 'unit_id', 'outcome', 'indexing', 'year', 'member_id', 'page'] as const;
+const FILTER_KEYS = ['q', 'scope', 'activity', 'deadline', 'office', 'stage', 'verification_status', 'campus_id', 'unit_id', 'outcome', 'indexing', 'year', 'member_id', 'page'] as const;
+
+// Lists opened from the faculty dashboard's task tiles
+const ACTIVITY_VIEWS: Record<string, { title: string; description: string }> = {
+    awaiting: { title: 'Awaiting verification', description: 'Your records with a submission the ORIES office has not checked yet.' },
+    returned: { title: 'Returned for correction', description: 'Your records whose latest submission was returned. Open each one to read the remarks, then correct and resubmit.' },
+};
+
+// Lists opened from the deadline tiles
+const DEADLINE_VIEWS: Record<string, { title: string; description: string; empty: string }> = {
+    overdue: {
+        title: 'Past their end date',
+        description: 'Verified ongoing records whose end date has passed. The lead should submit a completion or termination update with its Means of Verification.',
+        empty: 'No ongoing records are past their end date.',
+    },
+    ending_soon: {
+        title: 'Ending soon',
+        description: 'Verified ongoing records scheduled to end within the next few weeks.',
+        empty: 'No ongoing records are ending soon.',
+    },
+};
 
 export default function ProjectsPage() {
     return (
@@ -49,14 +69,15 @@ function ProjectSearch() {
     };
 
     const isMine = params.scope === 'mine';
+    const activity = params.activity ? ACTIVITY_VIEWS[params.activity] : params.deadline ? DEADLINE_VIEWS[params.deadline] : undefined;
     const units = lookups?.campuses.find((c) => String(c.id) === params.campus_id)?.units ?? [];
     const activeFilters = Object.keys(params).filter((k) => !['q', 'scope', 'page'].includes(k));
 
     return (
         <div>
             <PageHeader
-                title={isMine ? 'My Records' : 'Research, Innovation, and Extension Records'}
-                description={isMine ? 'Records you lead or are a member of, including those awaiting verification.' : 'Search verified records across EVSU. Unverified records appear only to the people involved and their reviewers.'}
+                title={activity?.title ?? (isMine ? 'My Records' : 'Research, Innovation, and Extension Records')}
+                description={activity?.description ?? (isMine ? 'Records you lead or are a member of, including those awaiting verification.' : 'Search verified records across EVSU. Unverified records appear only to the people involved and their reviewers.')}
                 actions={hasRole('faculty', 'head') ? <ButtonLink href="/projects/new">+ Submit a proposal</ButtonLink> : undefined}
             />
 
@@ -96,14 +117,19 @@ function ProjectSearch() {
                 </div>
                 {activeFilters.length > 0 && (
                     <button className="mt-2 text-xs text-brand-700 hover:underline" onClick={() => router.push(`${pathname}${params.scope ? `?scope=${params.scope}` : ''}`)}>
-                        Clear filters
+                        {activity ? `Show all ${isMine ? 'my ' : ''}records` : 'Clear filters'}
                     </button>
                 )}
             </Card>
 
             {error && <Alert>{error}</Alert>}
             {loading && !data ? <Loading /> : data && data.data.length === 0 ? (
-                <EmptyState>No records match these filters.</EmptyState>
+                <EmptyState>
+                    {params.activity === 'awaiting' ? 'None of your records are waiting for verification.'
+                        : params.activity === 'returned' ? 'Nothing to correct. None of your records have been returned.'
+                            : params.deadline ? DEADLINE_VIEWS[params.deadline]?.empty ?? 'No records match these filters.'
+                                : 'No records match these filters.'}
+                </EmptyState>
             ) : data && (
                 <>
                     <p className="mb-2 text-sm text-gray-600">{data.total} record(s)</p>
@@ -128,7 +154,12 @@ function ProjectSearch() {
                                         </td>
                                         <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{p.lead?.name}</td>
                                         <td className="px-4 py-3"><OfficeBadge office={p.office} /></td>
-                                        <td className="px-4 py-3">{p.verification_status === 'verified' ? <StageBadge stage={p.stage} /> : <VerificationBadge status={p.verification_status} />}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-wrap gap-1">
+                                                {p.verification_status === 'verified' ? <StageBadge stage={p.stage} /> : <VerificationBadge status={p.verification_status} />}
+                                                <DeadlineBadge deadline={p.deadline} endDate={p.end_date} />
+                                            </div>
+                                        </td>
                                         <td className="hidden px-4 py-3 text-gray-600 lg:table-cell">{p.campus?.name}{p.unit ? ` · ${p.unit.code ?? p.unit.name}` : ''}</td>
                                         <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">{formatDate(p.updated_at)}</td>
                                     </tr>

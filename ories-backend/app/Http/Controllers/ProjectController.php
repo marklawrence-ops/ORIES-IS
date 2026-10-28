@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
-use App\Models\Campus;
+use App\Models\Certificate;
 use App\Models\Project;
 use App\Models\ProjectOutcome;
 use App\Models\ProjectTag;
 use App\Models\ProjectUpdate;
-use App\Models\Unit;
 use App\Models\User;
 use App\Services\DuplicateTitleChecker;
 use App\Services\MovStorage;
 use App\Services\Notifier;
+use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +45,8 @@ class ProjectController extends Controller
             'year' => 'nullable|integer|min:1990|max:2100',
             'member_id' => 'nullable|integer',
             'scope' => 'nullable|in:mine,responsibility,all',
+            'activity' => 'nullable|in:awaiting,returned',
+            'deadline' => 'nullable|in:overdue,ending_soon',
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
@@ -59,14 +61,26 @@ class ProjectController extends Controller
             default => null,
         };
 
+        match ($filters['activity'] ?? null) {
+            'awaiting' => $query->awaitingVerification(),
+            'returned' => $query->returnedForCorrection(),
+            default => null,
+        };
+
+        match ($filters['deadline'] ?? null) {
+            'overdue' => $query->pastEndDate(),
+            'ending_soon' => $query->endingSoon(),
+            default => null,
+        };
+
         $query
             ->when($filters['q'] ?? null, function (Builder $q, string $term) {
-                $like = '%'.mb_strtolower($term).'%';
+                $like = Like::pattern($term);
                 $q->where(fn (Builder $w) => $w
-                    ->whereRaw('LOWER(title) LIKE ?', [$like])
-                    ->orWhereRaw('LOWER(keywords) LIKE ?', [$like])
-                    ->orWhereHas('members', fn (Builder $m) => $m->whereRaw('LOWER(name) LIKE ?', [$like]))
-                    ->orWhereHas('tags', fn (Builder $t) => $t->whereRaw('LOWER(label) LIKE ?', [$like])));
+                    ->whereRaw(Like::sql('title'), [$like])
+                    ->orWhereRaw(Like::sql('keywords'), [$like])
+                    ->orWhereHas('members', fn (Builder $m) => $m->whereRaw(Like::sql('name'), [$like]))
+                    ->orWhereHas('tags', fn (Builder $t) => $t->whereRaw(Like::sql('label'), [$like])));
             })
             ->when($filters['office'] ?? null, fn (Builder $q, $v) => $q->where('office', $v))
             ->when($filters['stage'] ?? null, fn (Builder $q, $v) => $q->where('stage', $v))
@@ -85,7 +99,8 @@ class ProjectController extends Controller
                 ->orWhereYear('completed_at', $y)));
 
         return response()->json(
-            $query->orderByDesc('updated_at')->paginate($filters['per_page'] ?? 15)->withQueryString()
+            $query->orderByDesc('updated_at')->orderByDesc('id')->paginate($filters['per_page'] ?? 15)->withQueryString()
+                ->through(fn (Project $p) => [...$p->toArray(), 'deadline' => $p->deadline()])
         );
     }
 
@@ -101,7 +116,7 @@ class ProjectController extends Controller
             'members.user:id,name,position',
             'tags',
             'outcomes',
-            'certificates' => fn ($q) => $q->with('recipient:id,name')->latest(),
+            'certificates' => fn ($q) => $q->with('recipient:id,name')->latest()->orderByDesc('id'),
         ]);
 
         $inspect = $project->canBeInspectedBy($user);
@@ -109,7 +124,7 @@ class ProjectController extends Controller
 
         $updates = $project->updates()
             ->with(['submitter:id,name', 'reviewer:id,name', 'attachments.uploader:id,name'])
-            ->latest()
+            ->latest()->orderByDesc('id')
             ->get()
             ->map(function (ProjectUpdate $update) use ($user, $project, $inspect, $canVerify) {
                 // Unverified files are visible only to the people involved and the verifiers
@@ -128,10 +143,10 @@ class ProjectController extends Controller
             : collect();
 
         return response()->json([
-            'project' => $project,
+            'project' => [...$project->toArray(), 'deadline' => $project->deadline()],
             'updates' => $updates,
             'imported_attachments' => $imported,
-            'activity' => $inspect ? $project->activity()->with('user:id,name')->latest()->get() : [],
+            'activity' => $inspect ? $project->activity()->with('user:id,name')->latest()->orderByDesc('id')->get() : [],
             'permissions' => [
                 'is_involved' => $project->isInvolved($user),
                 'can_inspect' => $inspect,
@@ -139,8 +154,13 @@ class ProjectController extends Controller
                 'can_submit_update' => $project->isInvolved($user)
                     && $project->verification_status === 'verified'
                     && ! $project->hasPendingUpdate(),
-                'can_resubmit' => $project->lead_id === $user->id && $project->verification_status === 'returned',
-                'can_request_certificate' => $project->isInvolved($user) && $project->verification_status === 'verified',
+                'can_change_details' => $project->lead_id === $user->id
+                    && $project->verification_status === 'verified'
+                    && ! $project->hasPendingUpdate(),
+                'can_resubmit' =>$project->lead_id === $user->id && $project->verification_status === 'returned',
+                'can_request_certificate' => $canRequest = $project->isInvolved($user) && $project->verification_status === 'verified',
+                // Each certificate type with the reason it can't be requested yet (null = available)
+                'certificate_types' => $canRequest ? Certificate::availabilityFor($project, $user) : (object) [],
                 'next_stages' => Project::STAGE_TRANSITIONS[$project->stage] ?? [],
             ],
         ]);
@@ -184,8 +204,8 @@ class ProjectController extends Controller
             ]);
 
             $project->members()->create(['user_id' => $user->id, 'name' => $user->name, 'role' => 'lead']);
-            $this->syncMembers($project, $data['members'] ?? []);
-            $this->syncTags($project, $data['tags'] ?? []);
+            $project->replaceMembers($project->normalizeMembers($data['members'] ?? []));
+            $project->replaceTags(Project::normalizeTags($data['tags'] ?? []));
 
             $update = $this->openUpdate($project, $user, 'proposal', remarks: $data['remarks'] ?? null);
             $this->storeFiles($request, $project, $update, $user);
@@ -220,10 +240,8 @@ class ProjectController extends Controller
                 'verification_status' => 'pending',
             ]);
 
-            $project->members()->where('role', '!=', 'lead')->delete();
-            $this->syncMembers($project, $data['members'] ?? []);
-            $project->tags()->delete();
-            $this->syncTags($project, $data['tags'] ?? []);
+            $project->replaceMembers($project->normalizeMembers($data['members'] ?? []));
+            $project->replaceTags(Project::normalizeTags($data['tags'] ?? []));
 
             $update = $this->openUpdate($project, $user, 'proposal', remarks: $data['remarks'] ?? null);
             $this->storeFiles($request, $project, $update, $user);
@@ -287,9 +305,104 @@ class ProjectController extends Controller
         return response()->json(['message' => 'Update submitted for verification.', 'update' => $update], 201);
     }
 
+    /**
+     * The lead proposes changes to a verified record's details, members, or tags (e.g., an approved
+     * extension or a change of team). Only the changed values are kept, as before/after pairs; the
+     * record itself stays as it is until a verifier applies them.
+     */
+    public function submitDetails(Request $request, Project $project): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($project->lead_id === $user->id, 403, 'Only the lead can change the record details.');
+        abort_unless($project->verification_status === 'verified', 422, 'The proposal must be verified first.');
+        abort_if($project->hasPendingUpdate(), 422, 'This record already has an update awaiting verification.');
+
+        $data = $request->validate([
+            ...collect($this->projectRules())->except(['office', 'proposed_at', 'remarks'])->all(),
+            'remarks' => 'required|string|max:2000',
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => 'file|max:'.config('ories.max_upload_kb').'|mimes:'.config('ories.allowed_mimes'),
+        ], [
+            'remarks.required' => 'Explain the reason for the change.',
+            'files.required' => 'Attach the approval or memo for this change as the Means of Verification.',
+        ]);
+
+        $changes = $this->detailChanges($project, $data);
+        abort_if($changes === [], 422, 'Nothing was changed.');
+
+        $update = DB::transaction(function () use ($project, $user, $data, $changes, $request) {
+            Project::lockForUpdate()->findOrFail($project->id);
+            abort_if($project->hasPendingUpdate(), 422, 'This record already has an update awaiting verification.');
+
+            $update = $this->openUpdate($project, $user, 'details', data: $changes, remarks: $data['remarks']);
+            if (isset($changes['fields']['title'])) {
+                $update->update(['duplicate_matches' => $this->checker->findMatches($changes['fields']['title']['to'], $project->id)]);
+            }
+            $this->storeFiles($request, $project, $update, $user);
+            ActivityLog::record($project, $user, 'update_submitted', $update->summary().' submitted for verification.');
+
+            return $update;
+        });
+
+        $this->notifyVerifiers($project, 'Update awaiting verification', $update->summary().' — '.$project->title);
+
+        return response()->json(['message' => 'Changes submitted for verification.', 'update' => $update], 201);
+    }
+
+    /**
+     * Compares submitted details with the verified record.
+     *
+     * @return array{fields?: array<string, array{from: mixed, to: mixed}>, members?: array{from: array, to: array}, tags?: array{from: array, to: array}}
+     */
+    private function detailChanges(Project $project, array $data): array
+    {
+        $changes = [];
+        $blank = fn ($v) => $v === null || $v === '' ? null : $v;
+
+        foreach (['title', 'abstract', 'keywords', 'funding_source', 'budget', 'start_date', 'end_date'] as $field) {
+            $from = $blank(match ($field) {
+                'start_date', 'end_date' => $project->{$field}?->toDateString(),
+                default => $project->{$field},
+            });
+            $to = $blank(is_string($data[$field] ?? null) ? trim($data[$field]) : ($data[$field] ?? null));
+            $same = $field === 'budget' ? ($from === null) === ($to === null) && (float) $from === (float) $to : $from === $to;
+            if (! $same) {
+                $changes['fields'][$field] = ['from' => $from, 'to' => $to];
+            }
+        }
+
+        $memberKey = fn (array $m) => $m['user_id'] ?? 'name:'.mb_strtolower($m['name']);
+        $currentMembers = $project->members()->where('role', '!=', 'lead')->orderBy('id')->get(['user_id', 'name'])
+            ->map(fn ($m) => ['user_id' => $m->user_id, 'name' => $m->name])->all();
+        $members = $project->normalizeMembers($data['members'] ?? []);
+        if (collect($currentMembers)->map($memberKey)->sort()->values()->all() !== collect($members)->map($memberKey)->sort()->values()->all()) {
+            $changes['members'] = ['from' => $currentMembers, 'to' => $members];
+        }
+
+        $tagKey = fn (array $t) => $t['type'].'|'.$t['label'];
+        $currentTags = $project->tags()->orderBy('id')->get(['type', 'unit_id', 'campus_id', 'label'])->map->only(['type', 'unit_id', 'campus_id', 'label'])->all();
+        $tags = Project::normalizeTags($data['tags'] ?? []);
+        if (collect($currentTags)->map($tagKey)->sort()->values()->all() !== collect($tags)->map($tagKey)->sort()->values()->all()) {
+            $changes['tags'] = ['from' => $currentTags, 'to' => $tags];
+        }
+
+        return $changes;
+    }
+
     private function validateProject(Request $request, bool $requireFiles): array
     {
         return $request->validate([
+            ...$this->projectRules(),
+            'files' => [$requireFiles ? 'required' : 'nullable', 'array', 'max:10'],
+            'files.*' => 'file|max:'.config('ories.max_upload_kb').'|mimes:'.config('ories.allowed_mimes'),
+        ], [
+            'files.required' => 'Attach the proposal document as the Means of Verification.',
+        ]);
+    }
+
+    private function projectRules(): array
+    {
+        return [
             'title' => 'required|string|max:255',
             'office' => ['required', Rule::in(User::OFFICES)],
             'abstract' => 'nullable|string|max:5000',
@@ -308,11 +421,7 @@ class ProjectController extends Controller
             'tags.*.unit_id' => 'nullable|integer|exists:units,id',
             'tags.*.campus_id' => 'nullable|integer|exists:campuses,id',
             'tags.*.label' => 'nullable|string|max:255',
-            'files' => [$requireFiles ? 'required' : 'nullable', 'array', 'max:10'],
-            'files.*' => 'file|max:'.config('ories.max_upload_kb').'|mimes:'.config('ories.allowed_mimes'),
-        ], [
-            'files.required' => 'Attach the proposal document as the Means of Verification.',
-        ]);
+        ];
     }
 
     private function projectFields(): array
@@ -338,43 +447,6 @@ class ProjectController extends Controller
     {
         foreach ($request->file('files', []) as $file) {
             $this->storage->storeUpload($file, $project, $update, $user);
-        }
-    }
-
-    private function syncMembers(Project $project, array $members): void
-    {
-        foreach ($members as $member) {
-            $account = isset($member['user_id']) ? User::find($member['user_id']) : null;
-            if ($account && $account->id === $project->lead_id) {
-                continue;
-            }
-            $project->members()->create([
-                'user_id' => $account?->id,
-                'name' => $account?->name ?? $member['name'],
-                'role' => 'member',
-            ]);
-        }
-    }
-
-    private function syncTags(Project $project, array $tags): void
-    {
-        foreach ($tags as $tag) {
-            $label = match ($tag['type']) {
-                'unit' => isset($tag['unit_id']) ? Unit::find($tag['unit_id'])?->name : null,
-                'campus' => isset($tag['campus_id']) ? Campus::find($tag['campus_id'])?->name : null,
-                default => null,
-            } ?? ($tag['label'] ?? null);
-
-            if (! $label) {
-                continue;
-            }
-
-            $project->tags()->create([
-                'type' => $tag['type'],
-                'unit_id' => $tag['type'] === 'unit' ? ($tag['unit_id'] ?? null) : null,
-                'campus_id' => $tag['type'] === 'campus' ? ($tag['campus_id'] ?? null) : null,
-                'label' => $label,
-            ]);
         }
     }
 

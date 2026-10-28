@@ -129,6 +129,63 @@ class Project extends Model
     }
 
     /**
+     * Records with a submission still waiting for a verifier.
+     */
+    public function scopeAwaitingVerification(Builder $query): Builder
+    {
+        return $query->whereHas('updates', fn (Builder $u) => $u->where('status', 'pending'));
+    }
+
+    /**
+     * Records whose latest submission was returned and has not been corrected yet
+     * (a correction is any newer submission, which replaces the returned one).
+     */
+    public function scopeReturnedForCorrection(Builder $query): Builder
+    {
+        return $query->whereHas('updates', fn (Builder $u) => $u
+            ->where('status', 'returned')
+            ->whereNotExists(fn ($newer) => $newer
+                ->selectRaw('1')
+                ->from('project_updates as newer')
+                ->whereColumn('newer.project_id', 'project_updates.project_id')
+                ->whereColumn('newer.id', '>', 'project_updates.id')));
+    }
+
+    /**
+     * Verified ongoing records whose end date has passed without a completion or termination.
+     */
+    public function scopePastEndDate(Builder $query): Builder
+    {
+        return $query->verified()->where('stage', 'ongoing')->whereDate('end_date', '<', today());
+    }
+
+    /**
+     * Verified ongoing records that end today or within the warning window.
+     */
+    public function scopeEndingSoon(Builder $query): Builder
+    {
+        return $query->verified()->where('stage', 'ongoing')
+            ->whereDate('end_date', '>=', today())
+            ->whereDate('end_date', '<=', today()->addDays(config('ories.ending_soon_days')));
+    }
+
+    /**
+     * 'overdue' or 'ending_soon' for verified ongoing records, matching the scopes above.
+     */
+    public function deadline(): ?string
+    {
+        if ($this->verification_status !== 'verified' || $this->stage !== 'ongoing' || ! $this->end_date) {
+            return null;
+        }
+
+        return match (true) {
+            $this->end_date->lt(today()) => 'overdue',
+            $this->end_date->lte(today()->addDays(config('ories.ending_soon_days'))) => 'ending_soon',
+            default => null,
+        };
+    }
+
+    /**
      * Records that the user leads or is a member of.
      */
     public function scopeInvolving(Builder $query, User $user): Builder
@@ -167,6 +224,76 @@ class Project extends Model
             || $user->hasRole('vp', 'oup')
             || ($user->hasRole('staff', 'director') && ($user->office === null || $user->office === $this->office))
             || ($user->hasRole('head') && $user->unit_id !== null && $user->unit_id === $this->unit_id);
+    }
+
+    /**
+     * Members other than the lead, as submitted: accounts take their account name; the lead is skipped.
+     *
+     * @return list<array{user_id: int|null, name: string}>
+     */
+    public function normalizeMembers(array $members): array
+    {
+        return collect($members)
+            ->map(function (array $member) {
+                $account = isset($member['user_id']) ? User::find($member['user_id']) : null;
+
+                return ['user_id' => $account?->id, 'name' => trim($account?->name ?? ($member['name'] ?? ''))];
+            })
+            ->reject(fn (array $m) => $m['name'] === '' || $m['user_id'] === $this->lead_id)
+            ->unique(fn (array $m) => $m['user_id'] ?? 'name:'.mb_strtolower($m['name']))
+            ->values()->all();
+    }
+
+    /**
+     * Contributor tags with their stored labels; tags without a resolvable label are dropped.
+     *
+     * @return list<array{type: string, unit_id: int|null, campus_id: int|null, label: string}>
+     */
+    public static function normalizeTags(array $tags): array
+    {
+        return collect($tags)
+            ->map(function (array $tag) {
+                $label = match ($tag['type']) {
+                    // Units on different campuses can share a name, so the label names the campus too
+                    'unit' => isset($tag['unit_id']) && ($unit = Unit::with('campus:id,name')->find($tag['unit_id']))
+                        ? "{$unit->name} ({$unit->campus?->name})"
+                        : null,
+                    'campus' => isset($tag['campus_id']) ? Campus::find($tag['campus_id'])?->name : null,
+                    default => null,
+                } ?? ($tag['label'] ?? null);
+
+                return [
+                    'type' => $tag['type'],
+                    'unit_id' => $tag['type'] === 'unit' ? ($tag['unit_id'] ?? null) : null,
+                    'campus_id' => $tag['type'] === 'campus' ? ($tag['campus_id'] ?? null) : null,
+                    'label' => trim((string) $label),
+                ];
+            })
+            ->reject(fn (array $t) => $t['label'] === '')
+            ->unique(fn (array $t) => $t['type'].'|'.$t['label'])
+            ->values()->all();
+    }
+
+    /**
+     * Replaces the non-lead members with an already normalized list.
+     */
+    public function replaceMembers(array $members): void
+    {
+        $this->members()->where('role', '!=', 'lead')->delete();
+        foreach ($members as $member) {
+            $this->members()->create([...$member, 'role' => 'member']);
+        }
+    }
+
+    /**
+     * Replaces the contributor tags with an already normalized list.
+     */
+    public function replaceTags(array $tags): void
+    {
+        $this->tags()->delete();
+        foreach ($tags as $tag) {
+            $this->tags()->create($tag);
+        }
     }
 
     public function hasPendingUpdate(): bool

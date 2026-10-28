@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/hooks';
-import { formatDate, OFFICE_LABELS, ROLE_LABELS } from '@/lib/format';
+import { formatDate, OFFICE_LABELS, roleLabel } from '@/lib/format';
 import type { Office, Project, Stage, VerificationStatus } from '@/lib/types';
 import { Alert, ButtonLink, Card, Loading, Modal, OfficeBadge, PageHeader, StageBadge, VerificationBadge } from '@/components/ui';
 
@@ -23,7 +23,7 @@ interface Dashboard {
     by_office: { office: Office; total: number }[];
     by_campus: { campus_id: number; campus: string; total: number }[];
     trend: { year: number; proposals: number; completed: number }[];
-    tasks: { label: string; value: number; link: string }[];
+    tasks: { label: string; value: number; link: string; tone?: 'red' }[];
     recent: (Pick<Project, 'id' | 'title' | 'office' | 'updated_at'> & { stage: Stage; verification_status: VerificationStatus; lead?: { name: string } })[];
 }
 
@@ -50,16 +50,16 @@ export default function DashboardPage() {
         <div className="space-y-6">
             <PageHeader
                 title={`Welcome, ${user.name.split(' ').slice(0, 2).join(' ')}`}
-                description={<>{ROLE_LABELS[user.role]} · Showing: <strong>{data.scope}</strong>. Click any figure to see the records behind it.</>}
+                description={<>{roleLabel(user.role, user.office)} · Showing: <strong>{data.scope}</strong>. Click any figure to see the records behind it.</>}
                 actions={hasRole('faculty', 'head') ? <ButtonLink href="/projects/new">+ Submit a proposal</ButtonLink> : undefined}
             />
 
             {data.tasks.some((t) => t.value > 0) && (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {data.tasks.filter((t) => t.value > 0).map((task) => (
-                        <Link key={task.label} href={task.link} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 hover:border-amber-400">
-                            <p className="text-2xl font-bold text-amber-800">{task.value}</p>
-                            <p className="text-sm text-amber-900">{task.label} →</p>
+                        <Link key={task.label} href={task.link} className={`rounded-lg border px-4 py-3 ${task.tone === 'red' ? 'border-red-200 bg-red-50 hover:border-red-400' : 'border-amber-200 bg-amber-50 hover:border-amber-400'}`}>
+                            <p className={`text-2xl font-bold ${task.tone === 'red' ? 'text-red-700' : 'text-amber-800'}`}>{task.value}</p>
+                            <p className={`text-sm ${task.tone === 'red' ? 'text-red-900' : 'text-amber-900'}`}>{task.label} →</p>
                         </Link>
                     ))}
                 </div>

@@ -6,12 +6,12 @@ import { useState, type FormEvent } from 'react';
 import api, { errorMessage } from '@/lib/api';
 import { useApi, useLookups } from '@/lib/hooks';
 import { CERTIFICATE_LABELS, formatDate, formatPeso, INDEXING_LABELS, OUTCOME_LABELS, PURPOSE_LABELS, STAGE_LABELS } from '@/lib/format';
-import type { OutcomeType, ProjectDetail, Stage } from '@/lib/types';
+import type { Certificate, OutcomeType, ProjectDetail, Stage } from '@/lib/types';
 import { AttachmentList, FileInput } from '@/components/Attachments';
 import ReviewPanel from '@/components/ReviewPanel';
 import StageTracker from '@/components/StageTracker';
 import { UpdateDetails } from '@/components/UpdateDetails';
-import { Alert, Badge, Button, ButtonLink, Card, Field, Input, Loading, Modal, OfficeBadge, Select, StageBadge, Textarea, VerificationBadge } from '@/components/ui';
+import { Alert, Badge, Button, ButtonLink, Card, DeadlineBadge, Field, Input, Loading, Modal, OfficeBadge, Select, StageBadge, Textarea, VerificationBadge } from '@/components/ui';
 
 export default function ProjectDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -36,17 +36,26 @@ export default function ProjectDetailPage() {
                             <OfficeBadge office={project.office} />
                             <VerificationBadge status={project.verification_status} />
                             {project.verification_status === 'verified' && <StageBadge stage={project.stage} />}
+                            <DeadlineBadge deadline={project.deadline} endDate={project.end_date} />
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {permissions.can_submit_update && <Button onClick={() => setModal('update')}>Submit update</Button>}
-                        {permissions.can_request_certificate && <Button variant="secondary" onClick={() => setModal('certificate')}>Request certificate</Button>}
+                        {permissions.can_change_details && <ButtonLink href={`/projects/${project.id}/details`} variant="secondary">Change details</ButtonLink>}
+                        {permissions.can_request_certificate &&<Button variant="secondary" onClick={() => setModal('certificate')}>Request certificate</Button>}
                         {permissions.can_resubmit && <ButtonLink href={`/projects/${project.id}/edit`}>Correct and resubmit</ButtonLink>}
                     </div>
                 </div>
             </div>
 
             {returned && <Alert tone="amber"><strong>Returned for correction:</strong> {returned.review_remarks}</Alert>}
+            {project.deadline && permissions.is_involved && !pending && (
+                <Alert tone={project.deadline === 'overdue' ? 'red' : 'amber'}>
+                    {project.deadline === 'overdue'
+                        ? <>This record was due to end on <strong>{formatDate(project.end_date)}</strong>. Submit a completion or termination update with its Means of Verification.</>
+                        : <>This record is scheduled to end on <strong>{formatDate(project.end_date)}</strong>. Prepare its completion report and Means of Verification.</>}
+                </Alert>
+            )}
             {pending && permissions.is_involved && !permissions.can_verify && (
                 <Alert tone="blue">“{pending.summary}” is awaiting verification by the ORIES {project.office} office. The record changes once it is verified.</Alert>
             )}
@@ -168,7 +177,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {modal === 'update' && <SubmitUpdateModal projectId={project.id} nextStages={permissions.next_stages} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
-            {modal === 'certificate' && <RequestCertificateModal projectId={project.id} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
+            {modal === 'certificate' && <RequestCertificateModal projectId={project.id} availability={permissions.certificate_types} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
         </div>
     );
 }
@@ -280,9 +289,19 @@ function SubmitUpdateModal({ projectId, nextStages, onClose, onDone }: { project
     );
 }
 
-function RequestCertificateModal({ projectId, onClose, onDone }: { projectId: number; onClose: () => void; onDone: () => void }) {
+function RequestCertificateModal({ projectId, availability, onClose, onDone }: {
+    projectId: number;
+    availability: Partial<Record<Certificate['type'], string | null>>;
+    onClose: () => void;
+    onDone: () => void;
+}) {
     const lookups = useLookups();
-    const [type, setType] = useState('participation');
+    const types = lookups?.certificate_types ?? [];
+    const available = types.filter((t) => availability[t] === null);
+    const [chosen, setType] = useState<string>('');
+    // Start on the first type this record qualifies for
+    const type = chosen || available[0] || '';
+    const unavailable = types.filter((t) => typeof availability[t] === 'string');
     const [purpose, setPurpose] = useState('promotion');
     const [remarks, setRemarks] = useState('');
     const [error, setError] = useState('');
@@ -305,11 +324,23 @@ function RequestCertificateModal({ projectId, onClose, onDone }: { projectId: nu
         <Modal open title="Request a certificate" onClose={onClose}>
             <form onSubmit={submit} className="space-y-4">
                 {error && <Alert>{error}</Alert>}
-                <Field label="Certificate">
-                    <Select value={type} onChange={(e) => setType(e.target.value)}>
-                        {(lookups?.certificate_types ?? []).map((t) => <option key={t} value={t}>{CERTIFICATE_LABELS[t]}</option>)}
-                    </Select>
-                </Field>
+                {available.length === 0 ? (
+                    <Alert>This record doesn&apos;t qualify for any certificate you haven&apos;t already requested.</Alert>
+                ) : (
+                    <Field label="Certificate">
+                        <Select value={type} onChange={(e) => setType(e.target.value)}>
+                            {available.map((t) => <option key={t} value={t}>{CERTIFICATE_LABELS[t]}</option>)}
+                        </Select>
+                    </Field>
+                )}
+                {unavailable.length > 0 && (
+                    <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+                        <p className="mb-1 font-semibold text-gray-700">Not available for this record yet</p>
+                        <ul className="space-y-1">
+                            {unavailable.map((t) => <li key={t}><span className="font-medium">{CERTIFICATE_LABELS[t]}:</span> {availability[t]}</li>)}
+                        </ul>
+                    </div>
+                )}
                 <Field label="Purpose">
                     <Select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
                         {(lookups?.certificate_purposes ?? []).map((p) => <option key={p} value={p}>{PURPOSE_LABELS[p]}</option>)}
@@ -319,7 +350,7 @@ function RequestCertificateModal({ projectId, onClose, onDone }: { projectId: nu
                 <p className="text-xs text-gray-500">The director of this record&apos;s office issues the certificate based on its verified history and MOVs.</p>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button type="submit" disabled={saving}>{saving ? 'Requesting…' : 'Request'}</Button>
+                    <Button type="submit" disabled={saving || !type}>{saving ? 'Requesting…' : 'Request'}</Button>
                 </div>
             </form>
         </Modal>

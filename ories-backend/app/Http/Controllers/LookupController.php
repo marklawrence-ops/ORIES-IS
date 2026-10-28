@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\ProjectOutcome;
 use App\Models\Target;
 use App\Models\User;
+use App\Support\Like;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,7 +44,7 @@ class LookupController extends Controller
             User::query()
                 ->where('status', 'active')
                 ->whereIn('role', User::SUBMITTERS)
-                ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($term).'%'])
+                ->whereRaw(Like::sql('name'), [Like::pattern($term)])
                 ->with('unit:id,code,name')
                 ->orderBy('name')
                 ->limit(10)

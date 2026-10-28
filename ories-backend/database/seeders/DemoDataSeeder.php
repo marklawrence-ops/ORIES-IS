@@ -129,7 +129,8 @@ class DemoDataSeeder extends Seeder
                 'proposed_at' => $proposed,
                 'start_date' => $started,
                 'completed_at' => $completed,
-                'end_date' => $completed,
+                // Ongoing records get a planned two-year duration; some are adjusted below for the deadline flags
+                'end_date' => $completed ?? ($started ? CarbonImmutable::parse($started)->addYears(2)->toDateString() : null),
                 'last_verified_at' => $completed ?? $started ?? $proposed,
             ]);
 
@@ -137,7 +138,7 @@ class DemoDataSeeder extends Seeder
             foreach ($memberEmails as $email) {
                 $project->members()->create(['user_id' => $users[$email]->id, 'name' => $users[$email]->name, 'role' => 'member']);
             }
-            $project->tags()->create(['type' => 'unit', 'unit_id' => $lead->unit_id, 'label' => $lead->unit->name]);
+            $project->tags()->create(['type' => 'unit', 'unit_id' => $lead->unit_id, 'label' => $lead->unit->name.' ('.$lead->unit->campus->name.')']);
             if ($partner) {
                 $project->tags()->create(['type' => 'partner', 'label' => $partner]);
             }
@@ -171,6 +172,18 @@ class DemoDataSeeder extends Seeder
             }
 
             ActivityLog::record($project, $verifier, 'seeded', 'Demonstration record loaded.');
+        }
+
+        // Relative to the seeding date so the overdue and ending-soon flags always have examples
+        $endDates = [
+            'Assessment of Microplastic Contamination in Cancabato Bay' => now()->subWeeks(6),
+            'Solar-Powered Cold Storage Unit for Small-Scale Fishers' => now()->subMonths(2),
+            'Flood Early Warning Mobile Application for Barangays Along the Binahaan River' => now()->subDays(10),
+            'Machine Learning Model for Predicting Student Attrition in State Universities' => now()->addWeeks(3),
+            'Food Safety and Sanitation Training for Tanauan Food Vendors' => now()->addDays(12),
+        ];
+        foreach ($endDates as $title => $end) {
+            Project::where('title', $title)->update(['end_date' => $end->toDateString()]);
         }
 
         $this->seedPendingWork($users, $staff);

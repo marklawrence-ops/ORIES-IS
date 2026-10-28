@@ -88,7 +88,8 @@ export function TagPicker({ tags, onChange, campuses }: { tags: TagDraft[]; onCh
         if (type === 'unit') {
             const unit = units.find((u) => String(u.id) === value);
             if (!unit) return;
-            tag = { type, unit_id: unit.id, label: unit.name };
+            // Same form the server stores: units on different campuses can share a name
+            tag = { type, unit_id: unit.id, label: `${unit.name} (${unit.campusName})` };
         } else if (type === 'campus') {
             const campus = campuses.find((c) => String(c.id) === value);
             if (!campus) return;

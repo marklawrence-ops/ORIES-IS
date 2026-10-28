@@ -18,6 +18,8 @@ Artisan::command('ories:remind-stale', function (Notifier $notifier) {
         ->where('stage', 'ongoing')
         ->where(fn ($q) => $q->whereNull('last_verified_at')->orWhere('last_verified_at', '<', now()->subDays($days)))
         ->whereDoesntHave('updates', fn ($q) => $q->where('status', 'pending'))
+        // Records past their end date get the more specific deadline reminder instead
+        ->whereNotIn('id', Project::query()->pastEndDate()->select('id'))
         ->with('lead')
         ->get();
 
@@ -32,6 +34,33 @@ Artisan::command('ories:remind-stale', function (Notifier $notifier) {
 
     $this->info("Sent {$projects->count()} reminder(s).");
 })->purpose('Remind leads of ongoing records that have not been updated recently');
+
+Artisan::command('ories:remind-deadlines', function (Notifier $notifier) {
+    // Leads who already submitted an update (e.g., the completion report) are not reminded again
+    $due = fn ($query) => $query->whereDoesntHave('updates', fn ($q) => $q->where('status', 'pending'))->with('lead')->get();
+
+    $overdue = $due(Project::query()->pastEndDate());
+    foreach ($overdue as $project) {
+        $notifier->send(
+            $project->lead,
+            'Record past its end date',
+            '"'.$project->title.'" was due to end on '.$project->end_date->format('F j, Y').'. Submit a completion or termination update with its Means of Verification.',
+            '/projects/'.$project->id,
+        );
+    }
+
+    $endingSoon = $due(Project::query()->endingSoon());
+    foreach ($endingSoon as $project) {
+        $notifier->send(
+            $project->lead,
+            'Record ending soon',
+            '"'.$project->title.'" is scheduled to end on '.$project->end_date->format('F j, Y').'. Prepare its completion report and Means of Verification.',
+            '/projects/'.$project->id,
+        );
+    }
+
+    $this->info("Sent {$overdue->count()} overdue and {$endingSoon->count()} ending-soon reminder(s).");
+})->purpose('Remind leads of ongoing records that are past or near their end date');
 
 Artisan::command('ories:retry-drive-backups', function (GoogleDrive $drive) {
     if (! $drive->backupEnabled()) {
@@ -160,4 +189,5 @@ Artisan::command('ories:evaluate-crosscheck {file=database/data/crosscheck_valid
 })->purpose('Evaluate the Crosschecking Module against a labeled set of title pairs');
 
 Schedule::command('ories:remind-stale')->weeklyOn(1, '8:00');
+Schedule::command('ories:remind-deadlines')->weeklyOn(1, '8:00');
 Schedule::command('ories:retry-drive-backups')->hourly();

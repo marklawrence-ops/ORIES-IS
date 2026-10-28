@@ -103,13 +103,20 @@ export interface DuplicateMatch {
     score: number;
 }
 
+// Before/after values of a change of details (only what changed)
+export interface DetailChanges {
+    fields?: Record<string, { from: string | number | null; to: string | number | null }>;
+    members?: { from: { user_id: number | null; name: string }[]; to: { user_id: number | null; name: string }[] };
+    tags?: { from: { type: string; label: string }[]; to: { type: string; label: string }[] };
+}
+
 export interface ProjectUpdate {
     id: number;
     project_id: number;
-    type: 'proposal' | 'stage' | 'outcome';
+    type: 'proposal' | 'stage' | 'outcome' | 'details';
     from_stage: Stage | null;
     to_stage: Stage | null;
-    data: (Partial<ProjectOutcome> & { date?: string }) | null;
+    data: (Partial<ProjectOutcome> & { date?: string } & DetailChanges) | null;
     remarks: string | null;
     duplicate_matches: DuplicateMatch[] | null;
     status: VerificationStatus;
@@ -159,6 +166,8 @@ export interface Project {
     budget: string | null;
     start_date: string | null;
     end_date: string | null;
+    // Sent by the list and record endpoints for verified ongoing records
+    deadline?: 'overdue' | 'ending_soon' | null;
     proposed_at: string | null;
     completed_at: string | null;
     last_verified_at: string | null;
@@ -191,8 +200,11 @@ export interface ProjectDetail {
         can_inspect: boolean;
         can_verify: boolean;
         can_submit_update: boolean;
+        can_change_details: boolean;
         can_resubmit: boolean;
         can_request_certificate: boolean;
+        // Each certificate type with the reason it can't be requested now (null = available)
+        certificate_types: Partial<Record<Certificate['type'], string | null>>;
         next_stages: Stage[];
     };
 }

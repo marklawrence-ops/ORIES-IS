@@ -30,6 +30,9 @@ return [
     // Ongoing records with no verified update for this many days trigger a reminder
     'stale_after_days' => (int) env('ORIES_STALE_AFTER_DAYS', 90),
 
+    // Ongoing records ending within this many days are flagged as "ending soon" on dashboards and lists
+    'ending_soon_days' => (int) env('ORIES_ENDING_SOON_DAYS', 30),
+
     'mail_notifications' => (bool) env('ORIES_MAIL_NOTIFICATIONS', false),
 
     // Password given to every seeded account; always override it on a server reachable from the Internet

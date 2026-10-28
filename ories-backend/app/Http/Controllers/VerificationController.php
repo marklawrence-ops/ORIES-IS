@@ -30,6 +30,7 @@ class VerificationController extends Controller
             ->with(['project:id,title,office,stage,verification_status,campus_id,unit_id', 'project.campus:id,name', 'project.unit:id,name,code', 'submitter:id,name', 'reviewer:id,name'])
             ->withCount('attachments')
             ->orderBy($status === 'pending' ? 'created_at' : 'reviewed_at', $status === 'pending' ? 'asc' : 'desc')
+            ->orderBy('id', $status === 'pending' ? 'asc' : 'desc')
             ->paginate(20);
 
         $updates->getCollection()->transform(fn (ProjectUpdate $u) => [...$u->toArray(), 'summary' => $u->summary()]);
@@ -55,6 +56,7 @@ class VerificationController extends Controller
                 'outcome' => $project->outcomes()->create(collect($update->data)->only([
                     'type', 'title', 'venue', 'indexing', 'date', 'url', 'citations', 'notes',
                 ])->all()),
+                'details' => $this->applyDetails($update),
             };
 
             $project->last_verified_at = now();
@@ -125,6 +127,25 @@ class VerificationController extends Controller
     {
         $status = ProjectUpdate::whereKey($update->id)->lockForUpdate()->value('status');
         abort_unless($status === 'pending', 422, 'This update has already been reviewed.');
+    }
+
+    /**
+     * Applies the "to" side of a change of details. Nothing else can change the record while the
+     * update is pending (one pending update per record), so the "from" side still matches.
+     */
+    private function applyDetails(ProjectUpdate $update): void
+    {
+        $project = $update->project;
+
+        foreach ($update->data['fields'] ?? [] as $field => $change) {
+            $project->{$field} = $change['to'];
+        }
+        if (isset($update->data['members'])) {
+            $project->replaceMembers($update->data['members']['to']);
+        }
+        if (isset($update->data['tags'])) {
+            $project->replaceTags($update->data['tags']['to']);
+        }
     }
 
     private function applyStage(ProjectUpdate $update): void

@@ -31,7 +31,7 @@ class CertificateController extends Controller
         $query = Certificate::query()
             ->with(['project:id,title,office,stage', 'recipient:id,name', 'issuer:id,name'])
             ->when($status, fn ($q) => $q->where('status', $status))
-            ->latest();
+            ->latest()->orderByDesc('id');
 
         if ($user->hasRole('director', 'staff')) {
             $query->whereHas('project', fn ($q) => $user->office ? $q->where('office', $user->office) : $q);
@@ -56,7 +56,7 @@ class CertificateController extends Controller
         abort_unless($project->isInvolved($user), 403, 'You can only request certificates for your own records.');
         abort_unless($project->verification_status === 'verified', 422, 'The record must be verified first.');
 
-        $eligibility = $this->eligibilityError($project, $data['type']);
+        $eligibility = Certificate::eligibilityError($project, $data['type']);
         abort_if($eligibility !== null, 422, $eligibility);
 
         $certificate = DB::transaction(function () use ($project, $user, $data) {
@@ -192,17 +192,5 @@ class CertificateController extends Controller
             403,
             'Only the director of this office can decide certificate requests.',
         );
-    }
-
-    private function eligibilityError(Project $project, string $type): ?string
-    {
-        return match ($type) {
-            'completion' => $project->stage === 'completed' ? null : 'A completion certificate requires a completed record.',
-            'publication' => $project->outcomes->contains('type', 'publication') ? null : 'A publication certificate requires a verified publication.',
-            'utilization' => $project->outcomes->whereIn('type', ['commercialization', 'policy', 'technology_transfer'])->isNotEmpty()
-                ? null
-                : 'A utilization certificate requires a verified commercialization, policy, or technology transfer outcome.',
-            default => null,
-        };
     }
 }

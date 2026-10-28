@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/projects/{project}', [ProjectController::class, 'show']);
     Route::post('/projects/{project}', [ProjectController::class, 'update']); // multipart resubmission
     Route::post('/projects/{project}/updates', [ProjectController::class, 'submitUpdate']);
+    Route::post('/projects/{project}/details', [ProjectController::class, 'submitDetails']); // multipart change of details
     Route::get('/attachments/{attachment}', [AttachmentController::class, 'download']);
 
     // Verification Module

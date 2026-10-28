@@ -27,6 +27,8 @@ interface DriveFile {
     imported_to: number | null;
 }
 
+const failedBackups = (s: StorageStatus) => Number(s.attachments.find((a) => a.drive_status === 'failed')?.total ?? 0);
+
 const STATUS_LABEL: Record<string, string> = {
     synced: 'Backed up to Google Drive',
     pending: 'Backup queued',
@@ -67,6 +69,12 @@ export default function StoragePage() {
             <Card title="Storage status">
                 {status.loading || !status.data ? <Loading /> : (
                     <div className="space-y-3 text-sm">
+                        {failedBackups(status.data) > 0 && (
+                            <Alert>
+                                {failedBackups(status.data)} file(s) could not be backed up to Google Drive. They are safe in local storage.
+                                Ask the technical staff to run <code>php artisan ories:drive-check</code> on the server to find the cause.
+                            </Alert>
+                        )}
                         <p>Local storage used: <strong>{formatBytes(status.data.local_bytes)}</strong></p>
                         <p>
                             Google Drive: {status.data.configured ? <Badge tone="green">set up</Badge> : <Badge tone="gray">not set up</Badge>}{' '}

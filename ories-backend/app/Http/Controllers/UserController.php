@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\Notifier;
+use App\Support\Like;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,8 +28,8 @@ class UserController extends Controller
         $users = User::query()
             ->with(['campus:id,name', 'unit:id,name,code'])
             ->when($filters['q'] ?? null, fn ($q, $term) => $q->where(fn ($w) => $w
-                ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($term).'%'])
-                ->orWhereRaw('LOWER(email) LIKE ?', ['%'.mb_strtolower($term).'%'])))
+                ->whereRaw(Like::sql('name'), [Like::pattern($term)])
+                ->orWhereRaw(Like::sql('email'), [Like::pattern($term)])))
             ->when($filters['role'] ?? null, fn ($q, $v) => $q->where('role', $v))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")

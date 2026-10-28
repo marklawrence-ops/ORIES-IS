@@ -1,13 +1,23 @@
 import type { Office, Role, Stage, VerificationStatus } from './types';
 
+// Role names for pickers; use roleLabel() to describe a specific person
 export const ROLE_LABELS: Record<Role, string> = {
     faculty: 'Faculty / Non-teaching',
     head: 'Head / Dean',
-    staff: 'ORIES Office / Technical Staff',
+    staff: 'ORIES Staff (office or technical)',
     director: 'Director',
     vp: 'Vice President, ORIES',
     oup: 'OUP / Planning Office (view-only)',
 };
+
+/**
+ * A person's role as shown in the app: staff assigned to an office are office staff of that
+ * office, and staff with no office are the technical staff who administer the system.
+ */
+export function roleLabel(role: Role, office?: Office | null): string {
+    if (role === 'staff') return office ? `ORIES Office Staff · ${OFFICE_LABELS[office]}` : 'Technical Staff';
+    return office ? `${ROLE_LABELS[role]} · ${OFFICE_LABELS[office]}` : ROLE_LABELS[role];
+}
 
 export const OFFICE_LABELS: Record<Office, string> = {
     research: 'Research',

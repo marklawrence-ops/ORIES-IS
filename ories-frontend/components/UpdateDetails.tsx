@@ -1,8 +1,8 @@
-import { formatDate, INDEXING_LABELS, OUTCOME_LABELS } from '@/lib/format';
+import { formatDate, formatPeso, INDEXING_LABELS, OUTCOME_LABELS } from '@/lib/format';
 import type { ProjectUpdate } from '@/lib/types';
 
 /**
- * The submitted values of a stage or outcome update.
+ * The submitted values of a stage, outcome, or change-of-details update.
  */
 export function UpdateDetails({ update }: { update: ProjectUpdate }) {
     const d = update.data;
@@ -31,5 +31,67 @@ export function UpdateDetails({ update }: { update: ProjectUpdate }) {
         );
     }
 
+    if (update.type === 'details' && d) {
+        const names = (list: { name: string }[]) => list.map((m) => m.name).join(', ') || 'None';
+        const labels = (list: { label: string }[]) => list.map((t) => t.label).join(', ') || 'None';
+
+        return (
+            <div className="space-y-2 text-sm">
+                <div className="overflow-x-auto rounded-md border border-gray-200">
+                    <table className="min-w-full text-left">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                            <tr>
+                                <th className="px-3 py-2">Field</th>
+                                <th className="px-3 py-2">{update.status === 'verified' ? 'Before' : 'Current'}</th>
+                                <th className="px-3 py-2">{update.status === 'verified' ? 'After' : 'Proposed'}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {Object.entries(d.fields ?? {}).map(([field, { from, to }]) => (
+                                <tr key={field}>
+                                    <td className="px-3 py-2 text-gray-500">{DETAIL_LABELS[field] ?? field}</td>
+                                    <td className="px-3 py-2 text-gray-600 line-through decoration-gray-400">{detailValue(field, from)}</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900">{detailValue(field, to)}</td>
+                                </tr>
+                            ))}
+                            {d.members && (
+                                <tr>
+                                    <td className="px-3 py-2 text-gray-500">Members</td>
+                                    <td className="px-3 py-2 text-gray-600">{names(d.members.from)}</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900">{names(d.members.to)}</td>
+                                </tr>
+                            )}
+                            {d.tags && (
+                                <tr>
+                                    <td className="px-3 py-2 text-gray-500">Contributor tags</td>
+                                    <td className="px-3 py-2 text-gray-600">{labels(d.tags.from)}</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900">{labels(d.tags.to)}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                {update.remarks && <p className="text-gray-700"><span className="text-gray-500">Reason:</span> {update.remarks}</p>}
+            </div>
+        );
+    }
+
     return update.remarks ? <p className="text-sm text-gray-600">Note: {update.remarks}</p> : null;
+}
+
+const DETAIL_LABELS: Record<string, string> = {
+    title: 'Title',
+    abstract: 'Abstract',
+    keywords: 'Keywords',
+    funding_source: 'Funding source',
+    budget: 'Budget',
+    start_date: 'Start date',
+    end_date: 'End date',
+};
+
+function detailValue(field: string, value: string | number | null): string {
+    if (value === null || value === '') return '—';
+    if (field === 'start_date' || field === 'end_date') return formatDate(String(value));
+    if (field === 'budget') return formatPeso(value);
+    return String(value);
 }

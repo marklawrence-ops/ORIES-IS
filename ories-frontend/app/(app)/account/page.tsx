@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import api, { errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { OFFICE_LABELS, ROLE_LABELS } from '@/lib/format';
+import { roleLabel } from '@/lib/format';
 import { Alert, Button, Card, Field, Input, PageHeader } from '@/components/ui';
 
 export default function AccountPage() {
@@ -29,7 +29,7 @@ export default function AccountPage() {
                 <dl className="grid grid-cols-3 gap-y-2 text-sm">
                     <dt className="text-gray-500">Name</dt><dd className="col-span-2">{user.name}</dd>
                     <dt className="text-gray-500">Email</dt><dd className="col-span-2">{user.email}</dd>
-                    <dt className="text-gray-500">Role</dt><dd className="col-span-2">{ROLE_LABELS[user.role]}{user.office ? ` · ${OFFICE_LABELS[user.office]}` : ''}</dd>
+                    <dt className="text-gray-500">Role</dt><dd className="col-span-2">{roleLabel(user.role, user.office)}</dd>
                     <dt className="text-gray-500">Position</dt><dd className="col-span-2">{user.position ?? '—'}</dd>
                     <dt className="text-gray-500">Assignment</dt><dd className="col-span-2">{[user.unit?.name, user.campus?.name].filter(Boolean).join(', ') || '—'}</dd>
                 </dl>

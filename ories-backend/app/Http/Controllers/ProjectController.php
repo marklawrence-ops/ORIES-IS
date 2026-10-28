@@ -230,7 +230,10 @@ class ProjectController extends Controller
         abort_unless($project->lead_id === $user->id, 403);
         abort_unless($project->verification_status === 'returned', 422, 'Only returned proposals can be edited.');
 
-        $data = $this->validateProject($request, requireFiles: false);
+        // A withdrawn proposal was taken back before anyone checked its files, so it needs a new one;
+        // after a return, the verifier may only have asked for corrected details
+        $withdrawn = $project->updates()->where('type', 'proposal')->latest('id')->value('status') === 'withdrawn';
+        $data = $this->validateProject($request, requireFiles: $withdrawn);
 
         DB::transaction(function () use ($project, $data, $user, $request) {
             $status = Project::whereKey($project->id)->lockForUpdate()->value('verification_status');

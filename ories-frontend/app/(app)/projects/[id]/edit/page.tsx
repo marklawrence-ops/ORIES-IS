@@ -21,7 +21,7 @@ export default function ResubmitProposalPage() {
     return (
         <div className="mx-auto max-w-4xl">
             <PageHeader title="Correct and Resubmit Proposal" description={data.project.title} />
-            <ProposalForm existing={data.project} returnRemarks={lastReturn?.review_remarks} />
+            <ProposalForm existing={data.project} returnRemarks={lastReturn?.review_remarks} wasWithdrawn={lastProposal?.status === 'withdrawn'} />
         </div>
     );
 }

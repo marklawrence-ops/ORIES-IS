@@ -13,14 +13,17 @@ import { Alert, Button, Card, Field, Input, Select, Textarea } from './ui';
 /**
  * Submits a new proposal, corrects a returned one, or proposes changes to a verified record's details.
  */
-export default function ProposalForm({ existing, returnRemarks, mode = existing ? 'resubmit' : 'new' }: {
+export default function ProposalForm({ existing, returnRemarks, wasWithdrawn = false, mode = existing ? 'resubmit' : 'new' }: {
     existing?: Project;
     returnRemarks?: string | null;
+    // A proposal withdrawn before review must come back with a new file
+    wasWithdrawn?: boolean;
     mode?: 'new' | 'resubmit' | 'change';
 }) {
     const router = useRouter();
     const lookups = useLookups();
     const changing = mode === 'change';
+    const filesRequired = !existing || changing || wasWithdrawn;
     const [form, setForm] = useState({
         title: existing?.title ?? '',
         office: (existing?.office ?? 'research') as Office,
@@ -46,7 +49,7 @@ export default function ProposalForm({ existing, returnRemarks, mode = existing 
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
-        if ((!existing || changing) && files.length === 0) {
+        if (filesRequired && files.length === 0) {
             setError(changing ? 'Attach the approval or memo for this change as the Means of Verification.' : 'Attach the proposal document as the Means of Verification.');
             return;
         }
@@ -84,6 +87,7 @@ export default function ProposalForm({ existing, returnRemarks, mode = existing 
     return (
         <form onSubmit={submit} className="space-y-6">
             {returnRemarks && <Alert tone="amber"><strong>Returned by ORIES:</strong> {returnRemarks}</Alert>}
+            {wasWithdrawn && <Alert tone="amber">You withdrew this proposal before review. Correct it and attach the right proposal document before resubmitting.</Alert>}
             {changing && (
                 <Alert tone="blue">
                     Edit only what has changed, such as an approved extension or a change of members. The record keeps its current details until the ORIES office verifies the change against the file you attach.
@@ -132,8 +136,8 @@ export default function ProposalForm({ existing, returnRemarks, mode = existing 
 
             <Card title="3. Means of Verification">
                 <div className="space-y-4">
-                    <Field label={changing ? 'Approval, memo, or other proof of the change' : existing ? 'Additional or corrected files' : 'Proposal document and supporting files'}>
-                        <FileInput files={files} onChange={setFiles} required={!existing || changing} />
+                    <Field label={changing ? 'Approval, memo, or other proof of the change' : existing && !wasWithdrawn ? 'Additional or corrected files' : 'Proposal document and supporting files'}>
+                        <FileInput files={files} onChange={setFiles} required={filesRequired} />
                     </Field>
                     {changing ? (
                         <Field label="Reason for the change" hint="Shown to the verifier, e.g., “Six-month extension approved by the University Research Council.”">

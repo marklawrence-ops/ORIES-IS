@@ -8,8 +8,10 @@ use App\Models\Project;
 use App\Models\ProjectUpdate;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -24,7 +26,9 @@ class MovStorage
     public function storeUpload(UploadedFile $file, Project $project, ?ProjectUpdate $update, User $user): Attachment
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin');
-        $path = $file->storeAs($this->directory($project), Str::uuid().'.'.$extension, $this->disk());
+        $path = $file->storeAs($this->directory($project), Str::uuid().'.'.$extension, $this->usableDisk());
+        // Cloud buckets are configured not to throw, so a failed write only shows up as false
+        $path ?: $this->failStore('the disk refused the upload', $project, $file->getClientOriginalName());
 
         return $this->register($project, $update, $user, $path, $file->getClientOriginalName(), $file->getMimeType(), 'upload');
     }
@@ -33,7 +37,8 @@ class MovStorage
     {
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION) ?: 'bin');
         $path = $this->directory($project).'/'.Str::uuid().'.'.$extension;
-        Storage::disk($this->disk())->put($path, $contents);
+        Storage::disk($this->usableDisk())->put($path, $contents)
+            ?: $this->failStore('the disk refused the upload', $project, $name);
 
         return $this->register($project, $update, $user, $path, $name, $mimeType, $source);
     }
@@ -64,6 +69,37 @@ class MovStorage
     public function disk(): string
     {
         return config('ories.mov_disk', 'local');
+    }
+
+    /**
+     * The MOV disk, after checking it exists. A missing disk (e.g., ORIES_MOV_DISK not matching the
+     * bucket's disk name on Laravel Cloud) is logged by name instead of failing as a generic error.
+     */
+    private function usableDisk(): string
+    {
+        $disk = $this->disk();
+        try {
+            Storage::disk($disk);
+        } catch (InvalidArgumentException) {
+            $this->failStore("ORIES_MOV_DISK is \"{$disk}\", but no disk with that name is configured");
+        }
+
+        return $disk;
+    }
+
+    /**
+     * Logs why a file could not be saved for the technical staff and tells the user plainly.
+     * The request's transaction rolls back, so no record is left without its file.
+     */
+    private function failStore(string $reason, ?Project $project = null, ?string $file = null): never
+    {
+        Log::error('MOV file could not be stored: '.$reason, [
+            'disk' => $this->disk(),
+            'project' => $project?->id,
+            'file' => $file,
+        ]);
+
+        abort(503, 'The file could not be saved, so nothing was submitted. Please try again later; if it keeps failing, contact the ORIES technical staff.');
     }
 
     private function register(Project $project, ?ProjectUpdate $update, User $user, string $path, string $name, ?string $mimeType, string $source): Attachment

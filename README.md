@@ -252,6 +252,8 @@ The backend goes to [Laravel Cloud](https://cloud.laravel.com) and the frontend 
 1. **Create the application.** *New application* → connect GitHub → choose this repository. Cloud detects the monorepo; select **`ories-backend`** as the application directory. Pick the region closest to your users (Asia-Pacific).
 2. **Attach a database.** On the environment canvas, add a **Postgres** database. Cloud injects the `DB_*` variables.
 3. **Attach a bucket for the MOV files.** Add a **Laravel Object Storage** bucket: visibility **Private**, disk name **`movs`**. Cloud's own disk is erased on every deployment, so uploaded files must live in the bucket.
+
+   The **disk name** is set when the bucket is attached to the environment, separately from the bucket's own name. It appears as *Disk* on the bucket card of the environment canvas. It must match `ORIES_MOV_DISK` in step 4 exactly. If you keep a different disk name (for example `private`), set `ORIES_MOV_DISK` to that name instead. Redeploy after changing either one.
 4. **Environment variables** (environment → *Settings* → *Environment variables*):
 
    ```env
@@ -303,4 +305,5 @@ Back on Laravel Cloud, set `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` to your Ver
 * **`Another next dev server is already running`** or **`Port 3000 is in use`**: an earlier `npm run dev` is still running. Stop it with `Ctrl+C` in its terminal, or end the process with the PID shown in the message (`taskkill /PID <pid> /F`), then run `npm run dev` again.
 * **Login shows "Authentication failed" for every account**: the backend is not running, or the database has not been seeded yet (`php artisan migrate --seed`).
 * **Deployed site can't sign in, and the browser console shows a CORS error**: `CORS_ALLOWED_ORIGINS` on Laravel Cloud doesn't match the Vercel address exactly (check `https://` and no trailing slash), or the backend wasn't redeployed after changing it.
+* **Every submission with a file fails with "The file could not be saved"**: the app can't write to the MOV disk. The Laravel Cloud log names the cause. *"no disk with that name is configured"* means `ORIES_MOV_DISK` doesn't match the bucket's disk name (Deployment step 3). *"the disk refused the upload"* means the bucket rejected the write, so check that it is still attached to the environment, then redeploy.
 * **Deployed site can't reach the API at all**: `NEXT_PUBLIC_API_URL` on Vercel is missing `/api`, points to the wrong address, or Vercel wasn't redeployed after setting it.

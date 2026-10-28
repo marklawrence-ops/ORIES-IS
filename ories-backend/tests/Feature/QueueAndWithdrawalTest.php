@@ -71,6 +71,25 @@ class QueueAndWithdrawalTest extends TestCase
         $this->assertSame('returned', $project->fresh()->verification_status);
         $this->getJson("/api/projects/{$project->id}")->assertJsonPath('permissions.can_resubmit', true);
         $this->assertDatabaseHas('activity_logs', ['project_id' => $project->id, 'action' => 'withdrawn']);
+
+        // Its files were never checked, so the resubmission must bring a new one
+        $resubmit = fn (array $files) => $this->post("/api/projects/{$project->id}", [
+            'title' => $project->title, 'office' => 'research', 'files' => $files,
+        ], ['Accept' => 'application/json']);
+        $resubmit([])->assertStatus(422)->assertJsonValidationErrors('files');
+        $resubmit([$this->mov('right-file.pdf')])->assertOk();
+        $this->assertSame(1, $project->updates()->where('status', 'pending')->firstOrFail()->attachments()->count());
+    }
+
+    public function test_a_returned_proposal_can_be_resubmitted_without_new_files(): void
+    {
+        $project = $this->submitProposal();
+        $this->actingAsUser('staff.research@evsu.edu.ph');
+        $this->postJson('/api/verification/'.$project->updates()->value('id').'/return', ['remarks' => 'Correct the title.'])->assertOk();
+
+        $this->actingAsUser('faculty@evsu.edu.ph');
+        $this->post("/api/projects/{$project->id}", ['title' => 'Rainwater Harvesting Systems for Rural Schools', 'office' => 'research'], ['Accept' => 'application/json'])
+            ->assertOk();
     }
 
     public function test_lead_and_members_are_notified_when_an_update_is_decided(): void
